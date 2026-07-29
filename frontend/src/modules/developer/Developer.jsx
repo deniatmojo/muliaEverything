@@ -11,6 +11,7 @@ import {
 const ALL_MENUS = [
   { path: '/', label: 'Dashboard Utama' },
   { path: '/profil', label: 'Profil Karyawan' },
+  { path: '/so', label: 'Project / SO' },
   { path: '/developer', label: 'Developer (Ruang Kendali)' },
   { path: '/pengaturan', label: 'Pengaturan Sistem' },
 ];

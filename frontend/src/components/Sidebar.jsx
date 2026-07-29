@@ -24,8 +24,8 @@ export default function Sidebar({ isOpen, setIsOpen }) {
   // 🌟 KAMUS MENU UTAMA (Kembali disinkronkan berdasarkan PATH sesuai isi Google Sheet Anda!)
   const menuItems = [
     { title: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { title: 'Project / SO', path: '/so', icon: Briefcase }, // 2. Tambahkan menu SO di sini tanpa tag < />
     { title: 'Profil Karyawan', path: '/profil', icon: Users },
+    { title: 'Project / SO', path: '/so', icon: Briefcase }, // 2. Tambahkan menu SO di sini tanpa tag < />
     { title: 'Developer', path: '/developer', icon: ShieldCheck },
     { title: 'Pengaturan', path: '/pengaturan', icon: Settings },
   ];
