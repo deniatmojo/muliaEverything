@@ -23,6 +23,10 @@ import DashboardSO from './modules/so/DashboardSO';
 import CreateSO from './modules/so/CreateSO';
 import DetailSO from './modules/so/DetailSO';
 
+// Import Modul QC Traceability
+import QCHome from './modules/qc/QCHome';
+import QcScan from './modules/qc/QcScan';
+
 // Dummy Components Sementara
 const Dashboard = () => (
   <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -53,6 +57,13 @@ export default function App() {
         </Route>
 
         {/* =========================================
+            ROUTE PUBLIK KHUSUS (Tanpa Login)
+            ========================================= */}
+        {/* Halaman hasil scan QR modul QC: siapa pun yang scan label bisa membuka,
+            pengubahan data tetap terkunci PIN dan diverifikasi di server. */}
+        <Route path="/qc/scan/:code" element={<QcScan />} />
+
+        {/* =========================================
             ROUTE SISTEM ADMIN (Area Privat, Dilindungi Satpam)
             ========================================= */}
         <Route element={<ProtectedRoute />}>
@@ -63,6 +74,7 @@ export default function App() {
             <Route path="profil" element={<Profile />} />
             <Route path="developer" element={<Developer />} />
             <Route path="pengaturan" element={<Pengaturan />} />
+            <Route path="qc" element={<QCHome />} />
             <Route path="*" element={<NotFound />} />
             <Route path="/so" element={<DashboardSO />} />
             <Route path="/so/create" element={<CreateSO />} />

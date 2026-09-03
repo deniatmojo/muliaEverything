@@ -36,6 +36,15 @@ const ROUTES = {
   GET_CONVERSATIONS:    { method: 'GET',  path: () => '/chat/conversations' },
   GET_CHAT_MESSAGES:    { method: 'GET',  path: (d) => `/chat/${encodeURIComponent(d.conversationId)}/messages${d.afterId ? `?afterId=${d.afterId}` : ''}` },
   SEND_CHAT_MESSAGE:    { method: 'POST', path: (d) => `/chat/${encodeURIComponent(d.conversationId)}/messages` },
+
+  // === Modul QC Traceability ===
+  QC_LIST_ITEMS:        { method: 'GET',  path: (d) => `/qc/items?search=${encodeURIComponent(d.search || '')}&type=${encodeURIComponent(d.type || 'all')}` },
+  QC_CREATE_ITEM:       { method: 'POST', path: () => '/qc/items' },
+  QC_UPDATE_ITEM:       { method: 'PUT',  path: (d) => `/qc/items/${encodeURIComponent(d.id)}` },
+  QC_TEAM:              { method: 'GET',  path: () => '/qc/team' },
+  QC_SCAN_GET:          { method: 'GET',  path: (d) => `/qc/public/${encodeURIComponent(d.code)}`, noAuth: true },
+  QC_SCAN_VERIFY_PIN:   { method: 'POST', path: (d) => `/qc/public/${encodeURIComponent(d.code)}/verify-pin`, noAuth: true },
+  QC_SCAN_UPDATE:       { method: 'POST', path: (d) => `/qc/public/${encodeURIComponent(d.code)}/update`, noAuth: true },
 };
 
 /**
@@ -53,7 +62,8 @@ export const callApi = async (action, data = {}) => {
     }
 
     const headers = { 'Content-Type': 'application/json' };
-    const token = localStorage.getItem('token');
+    // Endpoint publik (halaman scan QC) tidak mengirim/olah token sama sekali
+    const token = route.noAuth ? null : localStorage.getItem('token');
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const response = await fetch(`${API_URL}${route.path(data)}`, {
@@ -67,7 +77,7 @@ export const callApi = async (action, data = {}) => {
 
     // Token kadaluarsa/tidak valid: bersihkan sesi dan arahkan ke login
     // agar user tidak terjebak di halaman yang semua datanya gagal dimuat.
-    if (result.code === 401 && !['LOGIN', 'REGISTER', 'VERIFY_TOKEN'].includes(action)) {
+    if (result.code === 401 && !route.noAuth && !['LOGIN', 'REGISTER', 'VERIFY_TOKEN'].includes(action)) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       // hanya redirect jika belum di halaman auth agar tidak loop

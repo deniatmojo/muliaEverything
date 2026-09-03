@@ -11,6 +11,7 @@ const ALL_MENUS = [
   { path: '/', label: 'Dashboard Utama' },
   { path: '/profil', label: 'Profil Karyawan' },
   { path: '/so', label: 'Project / SO' },
+  { path: '/qc', label: 'QC Traceability' },
   { path: '/developer', label: 'Developer (Ruang Kendali)' },
 ];
 
