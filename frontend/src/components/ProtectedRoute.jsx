@@ -3,25 +3,22 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 export default function ProtectedRoute() {
   const location = useLocation();
-  
-  // 1. ATURAN DASAR (Persis seperti kode lama Anda yang sangat stabil)
-  const isDevMode = localStorage.getItem('isDevMode') === 'true';
-  const isAuthenticated = localStorage.getItem('token') !== null;
 
-  // Jika tidak ada tiket dan bukan mode dev, tendang ke login
-  if (!isDevMode && !isAuthenticated) {
+  // Wajib memiliki token login (tidak ada lagi bypass mode pengembangan)
+  const isAuthenticated = localStorage.getItem('token') !== null;
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. Ambil data identitas user
+  // Ambil data identitas user
   const userStr = localStorage.getItem('user');
   let user = null;
-  try { 
-    user = JSON.parse(userStr); 
+  try {
+    user = JSON.parse(userStr);
   } catch (e) {}
 
-  // Jika Mode Dev aktif ATAU yang login adalah Developer (God Mode), buka semua gerbang!
-  if (isDevMode || user?.role === 'Developer') {
+  // Yang login adalah Developer (God Mode), buka semua gerbang!
+  if (user?.role === 'Developer') {
     return <Outlet />; // Silakan lewat dan render halamannya
   }
 

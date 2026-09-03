@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment (berisi kredensial - jangan commit!)
+.env
+backend/.env
+
+# File upload user
+backend/uploads/
+
+# Build
+frontend/dist/
+
+# Misc
+*.log
+.DS_Store
+
+# Artefak tool
+graphify-out/

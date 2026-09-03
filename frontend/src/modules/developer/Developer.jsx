@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { callApi } from '../../services/api'; // Jembatan GAS kita
-import { 
-  ShieldAlert, ToggleLeft, ToggleRight, CheckCircle, XCircle, 
-  Users, Loader2, X, Copy, KeyRound, Plus, LayoutGrid, 
-  Edit, Save, CheckCircle2, AlertCircle 
+import {
+  ShieldAlert, CheckCircle, XCircle,
+  Users, Loader2, X, Copy, KeyRound, Plus, LayoutGrid,
+  Edit, Save, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
 // 🌟 KAMUS ALL_MENUS UNTUK RBAC MULIA EVERYTHING
-// Catatan: Menu yang sudah tidak dipakai bisa Anda hapus nanti
 const ALL_MENUS = [
   { path: '/', label: 'Dashboard Utama' },
   { path: '/profil', label: 'Profil Karyawan' },
   { path: '/so', label: 'Project / SO' },
   { path: '/developer', label: 'Developer (Ruang Kendali)' },
-  { path: '/pengaturan', label: 'Pengaturan Sistem' },
 ];
 
 export default function Developer() {
@@ -24,8 +22,6 @@ export default function Developer() {
     setTimeout(() => setNotice({ show: false, message: '', type: 'success' }), 4000);
   };
 
-  const [isDevMode, setIsDevMode] = useState(false);
-  
   const [pendingUsers, setPendingUsers] = useState([]);
   const [activeUsers, setActiveUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -44,7 +40,6 @@ export default function Developer() {
   const [approvalResult, setApprovalResult] = useState(null);
 
   useEffect(() => {
-    setIsDevMode(localStorage.getItem('isDevMode') === 'true');
     fetchAllData();
   }, []);
 
@@ -70,13 +65,6 @@ export default function Developer() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleToggleDevMode = () => {
-    const newStatus = !isDevMode;
-    setIsDevMode(newStatus);
-    localStorage.setItem('isDevMode', newStatus);
-    showNotice(`Mode Pengembangan ${newStatus ? 'diaktifkan' : 'dinonaktifkan'}!`);
   };
 
   const handleMenuCheckbox = (path) => {
@@ -214,19 +202,6 @@ export default function Developer() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <div className="lg:col-span-1 space-y-6">
-          
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Pengaturan Sistem</h3>
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
-              <div>
-                <p className="font-semibold text-gray-800 dark:text-white">Mode Pengembangan</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Nonaktifkan wajib login</p>
-              </div>
-              <button onClick={handleToggleDevMode} className={`transition-colors duration-300 ${isDevMode ? 'text-aira-cyan' : 'text-gray-400'}`}>
-                {isDevMode ? <ToggleRight size={40} /> : <ToggleLeft size={40} />}
-              </button>
-            </div>
-          </div>
 
           <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">

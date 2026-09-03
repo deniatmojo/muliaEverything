@@ -353,10 +353,10 @@ const DashboardSO = () => {
       </div>
 
       {/* =========================================
-          SECTION 1: CHART & DATA ACTIVITY 
+          SECTION 1: CHART & DATA ACTIVITY
           ========================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
-        
+
         {/* Left: SO trend chart */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6 flex flex-col transition-colors">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -491,7 +491,7 @@ const DashboardSO = () => {
       </div>
 
       {/* =========================================
-          SECTION 2: SUMMARY CARDS 
+          SECTION 2: SUMMARY CARDS
           ========================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
         {summaryCards.map((card, idx) => (

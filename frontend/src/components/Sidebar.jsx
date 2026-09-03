@@ -27,7 +27,6 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     { title: 'Profil Karyawan', path: '/profil', icon: Users },
     { title: 'Project / SO', path: '/so', icon: Briefcase }, // 2. Tambahkan menu SO di sini tanpa tag < />
     { title: 'Developer', path: '/developer', icon: ShieldCheck },
-    { title: 'Pengaturan', path: '/pengaturan', icon: Settings },
   ];
 
   // 🛡️ LOGIKA PENYARINGAN MENU DINAMIS (Mencocokkan Array Path dari Google Sheets)

@@ -15,6 +15,7 @@ const Profile = () => {
     position: '',
     phone: '',
     email: '',
+    username: '',
     avatar_url: '',
   });
 
@@ -48,6 +49,10 @@ const Profile = () => {
 
   const getDirectImageUrl = (url) => {
     if (!url) return '';
+    if (url.startsWith('/uploads/')) {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      return apiBase.replace(/\/api$/, '') + url;
+    }
     if (url.includes('drive.google.com')) {
       const match = url.match(/id=([a-zA-Z0-9_-]+)/);
       if (match && match[1]) {
@@ -79,6 +84,7 @@ const Profile = () => {
             position: resProfile.data.position || 'Karyawan Mulia Everything',
             phone: resProfile.data.phone_number || '',
             email: resProfile.data.email || '',
+            username: resProfile.data.username || '',
             avatar_url: resProfile.data.avatar_url || '',
           });
         }
@@ -106,12 +112,13 @@ const Profile = () => {
       const response = await callApi('UPDATE_PROFILE', {
         userId: currentUser.id,
         name: formData.name,
+        username: formData.username,
         phone_number: formData.phone,
         position: formData.position
       });
 
       if (response.status === 'success') {
-        const updatedUser = { ...currentUser, nama: formData.name };
+        const updatedUser = { ...currentUser, nama: formData.name, username: formData.username };
         localStorage.setItem('user', JSON.stringify(updatedUser));
         
         // Pancing Topbar agar ikut memperbarui tulisan namanya
@@ -349,6 +356,22 @@ const Profile = () => {
                         onChange={handleInputChange}
                         className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0084C9]"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username <span className="text-xs text-gray-400">(untuk login &amp; di-tag @)</span></label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+                        <input
+                          type="text"
+                          name="username"
+                          value={formData.username}
+                          onChange={handleInputChange}
+                          autoCapitalize="none"
+                          placeholder="mis. deni.atmojo"
+                          className="w-full pl-8 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0084C9]"
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">3-50 karakter; huruf, angka, titik, underscore.</p>
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Jabatan / Departemen</label>

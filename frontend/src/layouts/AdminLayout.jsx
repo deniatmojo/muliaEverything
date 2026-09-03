@@ -4,6 +4,7 @@ import { Outlet } from 'react-router-dom';
 // Pastikan path import ini sesuai dengan struktur folder Anda
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
+import ChatBubble from '../components/ChatBubble';
 
 export default function AdminLayout() {
   // State global untuk layout: Mengontrol Sidebar di layar Mobile (HP)
@@ -28,8 +29,11 @@ export default function AdminLayout() {
           
           {/* <Outlet /> adalah "lubang" ajaib dari React Router DOM */}
           <Outlet />
-          
+
         </main>
+
+        {/* Chat pribadi antar pengguna (bubble pojok kanan bawah) */}
+        <ChatBubble />
       </div>
     </div>
   );

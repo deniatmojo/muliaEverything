@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { callApi } from '../../services/api'; // Jembatan GAS kita
-import { Lock, Mail, RefreshCw, AlertCircle } from 'lucide-react';
+import { Lock, Mail, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sesiBerakhir = searchParams.get('expired') === '1';
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -77,7 +79,14 @@ export default function Login() {
 
       <div className="p-8">
         <form onSubmit={handleLogin} className="space-y-6">
-          
+
+          {sesiBerakhir && (
+            <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
+              <Clock size={18} className="flex-shrink-0" />
+              <p>Sesi Anda telah berakhir. Silakan login kembali.</p>
+            </div>
+          )}
+
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
               <AlertCircle size={18} className="flex-shrink-0" />
@@ -86,16 +95,17 @@ export default function Login() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Akun</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username / Email</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Mail className="h-5 w-5 text-gray-400" />
               </div>
               <input
-                type="email"
+                type="text"
+                autoCapitalize="none"
                 required
                 className="block w-full pl-10 pr-3 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-aira-cyan focus:border-transparent transition-all"
-                placeholder="email@mulia.com"
+                placeholder="username atau email@mulia.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}

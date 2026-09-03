@@ -11,7 +11,8 @@ export default function Topbar({ onMenuClick }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isLoadingNotif, setIsLoadingNotif] = useState(false);
-  const [recentActivities, setRecentActivities] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const profileRef = useRef(null);
   const notifRef = useRef(null);
@@ -42,6 +43,10 @@ export default function Topbar({ onMenuClick }) {
 
   const getDirectImageUrl = (url) => {
     if (!url) return '';
+    if (url.startsWith('/uploads/')) {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      return apiBase.replace(/\/api$/, '') + url;
+    }
     if (url.includes('drive.google.com')) {
       const match = url.match(/id=([a-zA-Z0-9_-]+)/);
       if (match && match[1]) {
@@ -67,28 +72,57 @@ export default function Topbar({ onMenuClick }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fungsi untuk mengambil notifikasi dari GAS
+  // Memuat notifikasi lonceng dari server
+  const loadNotifications = async () => {
+    try {
+      const res = await callApi('GET_MY_NOTIFICATIONS');
+      if (res.status === 'success') {
+        setNotifications(res.data.items || []);
+        setUnreadCount(res.data.unread || 0);
+      }
+    } catch (error) {
+      console.error('Gagal memuat notifikasi', error);
+    }
+  };
+
+  // Polling ringan setiap 20 detik agar notifikasi & badge tetap segar
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 20000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fungsi membuka/menutup dropdown notifikasi
   const toggleNotifications = async () => {
     if (isNotifOpen) {
       setIsNotifOpen(false);
       return;
     }
-    
+
     setIsNotifOpen(true);
     setIsProfileOpen(false);
     setIsLoadingNotif(true);
 
     try {
-      const res = await callApi('GET_MY_ACTIVITIES', { userId: userData.id });
-      if (res.status === 'success') {
-        // Ambil maksimal 5 aktivitas terbaru untuk notifikasi cepat
-        setRecentActivities(res.data.slice(0, 5));
-      }
-    } catch (error) {
-      console.error("Gagal memuat notifikasi", error);
+      await loadNotifications();
     } finally {
       setIsLoadingNotif(false);
     }
+  };
+
+  // Klik notifikasi: tandai dibaca lalu arahkan ke halaman terkait
+  const handleNotificationClick = async (notif) => {
+    await callApi('READ_NOTIFICATIONS', { ids: [notif.id] });
+    setIsNotifOpen(false);
+    if (notif.link) {
+      navigate(notif.link);
+    }
+    loadNotifications();
+  };
+
+  const markAllRead = async () => {
+    await callApi('READ_NOTIFICATIONS', {});
+    loadNotifications();
   };
 
   const displayName = userData?.nama || 'User';
@@ -117,39 +151,55 @@ export default function Topbar({ onMenuClick }) {
         <div className="relative" ref={notifRef}>
           <button onClick={toggleNotifications} className="relative p-2.5 rounded-full bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:text-aira-cyan transition-all">
             <Bell size={20} />
-            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
 
           {isNotifOpen && (
             <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden transform transition-all">
               <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                <p className="font-semibold text-gray-800 dark:text-white">Aktivitas Terakhir</p>
+                <p className="font-semibold text-gray-800 dark:text-white">Notifikasi</p>
+                {unreadCount > 0 && (
+                  <button onClick={markAllRead} className="text-xs font-medium text-aira-cyan hover:underline">
+                    Tandai semua dibaca
+                  </button>
+                )}
               </div>
               <div className="max-h-80 overflow-y-auto">
                 {isLoadingNotif ? (
                   <div className="flex justify-center items-center p-8">
                     <Loader2 className="animate-spin text-aira-cyan" size={24} />
                   </div>
-                ) : recentActivities.length > 0 ? (
+                ) : notifications.length > 0 ? (
                   <div className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {recentActivities.map((log) => (
-                      <div key={log.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    {notifications.map((notif) => (
+                      <button
+                        key={notif.id}
+                        onClick={() => handleNotificationClick(notif)}
+                        className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${!notif.is_read ? 'bg-aira-cyan/5' : ''}`}
+                      >
                         <div className="flex items-start gap-3">
-                          <div className="p-2 bg-aira-cyan/10 text-aira-cyan rounded-lg">
-                            <Activity size={16} />
+                          <div className={`p-2 rounded-lg ${!notif.is_read ? 'bg-aira-cyan/15 text-aira-cyan' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
+                            <Bell size={16} />
                           </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-800 dark:text-white">{log.action}</p>
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{log.description}</p>
-                            <p className="text-[10px] text-gray-400 mt-2">{log.date}</p>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 dark:text-white flex items-center gap-2">
+                              <span className="truncate">{notif.title}</span>
+                              {!notif.is_read && <span className="w-2 h-2 bg-aira-cyan rounded-full flex-shrink-0"></span>}
+                            </p>
+                            {notif.message && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{notif.message}</p>}
+                            <p className="text-[10px] text-gray-400 mt-2">{new Date(notif.date).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</p>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 ) : (
                   <div className="p-8 text-center text-gray-500">
-                    <p className="text-sm">Belum ada aktivitas tercatat.</p>
+                    <p className="text-sm">Belum ada notifikasi.</p>
                   </div>
                 )}
               </div>
