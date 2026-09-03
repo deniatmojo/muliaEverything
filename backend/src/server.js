@@ -14,10 +14,13 @@ import { fail } from './utils.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Izinkan semua port dev lokal (5173, 5174, dst) supaya tidak bentrok saat Vite pindah port
+// Izinkan semua port dev lokal + domain produksi dari FRONTEND_URL
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
+    const diizinkan = !origin
+      || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      || origin === process.env.FRONTEND_URL;
+    if (diizinkan) return cb(null, true);
     cb(new Error('Origin tidak diizinkan oleh CORS'));
   },
 }));
