@@ -29,7 +29,6 @@ const BUNDLE_FIELDS = [
   { k: 'qty', label: 'QTY (PCS)', req: true, type: 'number', ph: '40', half: true },
   { k: 'dimension', label: 'Dimension (mm)', ph: '11500', half: true },
   { k: 'color', label: 'Color', ph: 'BLUE', half: true },
-  { k: 'date_qc', label: 'Date QC Check', type: 'date', half: true },
   { k: 'bundle_no', label: 'Bundle No.', req: true, type: 'number', ph: '1', half: true },
   { k: 'total_bundles', label: 'Total Bundles', req: true, type: 'number', ph: '10', half: true },
   { k: 'description', label: 'Product Description', type: 'textarea', ph: 'Tambahkan deskripsi (opsional)...' },
@@ -44,6 +43,11 @@ const FIELDS_PER_TYPE = { bundle: BUNDLE_FIELDS, coil: COIL_FIELDS, packaging: [
 
 const PAPER_OPTIONS = [58, 70, 80, 100];
 const PAPER_LS_KEY = 'qc_paper_mm';
+
+// Tanggal pengecekan otomatis: terisi saat checker gudang update via halaman scan
+const fmtCheckDate = (item) => item?.scan_updated_at
+  ? new Date(item.scan_updated_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
+  : '-';
 
 // Logo segitiga MULIA 41 untuk label cetak
 const MuliaLogo = ({ size = 30 }) => (
@@ -62,7 +66,7 @@ function BundleLabel({ item, qrValue }) {
     ['CUSTOMER', d.customer], ['SO NUMBER', d.so_number], ['PRODUCT NAME', d.product_name],
     ['QTY (PCS)', d.qty], ['DIMENSION (mm)', d.dimension], ['COLOR', d.color],
     ['BUNDLE NO.', d.bundle_no], ['TOTAL BUNDLES', d.total_bundles],
-    ['DATE QC CHECK', d.date_qc],
+    ['DATE QC CHECK', fmtCheckDate(item)],
   ];
   const td = { border: '1px solid #000', padding: '5px', textTransform: 'uppercase', fontSize: 10 };
   return (
@@ -99,7 +103,7 @@ function BundleLabel({ item, qrValue }) {
 
 function CoilLabel({ item, qrValue }) {
   const d = item.data || {};
-  const rows = [['TYPE COIL', d.type_coil], ['BERAT', `${d.berat || '-'} KG`], ['NO. COIL', d.no_coil], ['SUPPLIER', d.supplier]];
+  const rows = [['TYPE COIL', d.type_coil], ['BERAT', `${d.berat || '-'} KG`], ['NO. COIL', d.no_coil], ['SUPPLIER', d.supplier], ['DATE QC CHECK', fmtCheckDate(item)]];
   return (
     <div style={{ background: '#fff', padding: 14, color: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', borderBottom: '3px solid #000', paddingBottom: 10, marginBottom: 16 }}>
@@ -441,6 +445,9 @@ export default function QCHome() {
                     <div className="text-[11px] text-gray-700 dark:text-gray-300 font-medium flex items-center gap-1">
                       {item.inspector ? <><UserCheck size={12} className="text-green-500" /> Insp: {item.inspector}</> : <><UserX size={12} className="text-gray-400" /> <span className="italic text-gray-400">Belum diisi</span></>}
                     </div>
+                    {item.scan_updated_at && (
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500">Dicek: {fmtCheckDate(item)}</div>
+                    )}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     {new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}

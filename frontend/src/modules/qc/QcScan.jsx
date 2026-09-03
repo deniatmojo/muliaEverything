@@ -234,8 +234,15 @@ export default function QcScan() {
                     <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3 mt-2 border border-gray-100 dark:border-gray-600">
                       <div className="text-[11px] font-bold text-gray-400 uppercase mb-1">Inspector QC</div>
                       {item.inspector ? (
-                        <div className="font-medium text-gray-800 dark:text-gray-200 text-sm flex items-center gap-1">
-                          <UserCheck size={14} className="text-green-500" /> {item.inspector}
+                        <div>
+                          <div className="font-medium text-gray-800 dark:text-gray-200 text-sm flex items-center gap-1">
+                            <UserCheck size={14} className="text-green-500" /> {item.inspector}
+                          </div>
+                          {item.scan_updated_at && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              Dicek: {new Date(item.scan_updated_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="font-medium text-gray-500 text-sm italic flex items-center gap-1">
