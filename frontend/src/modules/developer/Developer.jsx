@@ -12,6 +12,7 @@ const ALL_MENUS = [
   { path: '/profil', label: 'Profil Karyawan' },
   { path: '/so', label: 'Project / SO' },
   { path: '/qc', label: 'QC Traceability' },
+  { path: '/maintenance', label: 'Maintenance' },
   { path: '/developer', label: 'Developer (Ruang Kendali)' },
 ];
 

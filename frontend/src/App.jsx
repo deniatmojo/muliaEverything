@@ -20,6 +20,7 @@ import Pengaturan from './modules/settings/Pengaturan';
 import Profile from './modules/profile/Profile'; 
 
 import DashboardSO from './modules/so/DashboardSO';
+import DashboardHome from './modules/dashboard/Dashboard';
 import CreateSO from './modules/so/CreateSO';
 import DetailSO from './modules/so/DetailSO';
 
@@ -27,13 +28,11 @@ import DetailSO from './modules/so/DetailSO';
 import QCHome from './modules/qc/QCHome';
 import QcScan from './modules/qc/QcScan';
 
+// Import Modul Maintenance
+import MaintenanceHome from './modules/maintenance/MaintenanceHome';
+
 // Dummy Components Sementara
-const Dashboard = () => (
-  <div className="p-6 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-    <h2 className="text-2xl font-bold text-aira-navy dark:text-aira-cyan mb-2">Dashboard Utama</h2>
-    <p className="text-gray-500 dark:text-gray-400">Selamat datang di Enterprise Portal Mulia Everything.</p>
-  </div>
-);
+const Dashboard = () => <DashboardHome />;
 
 const NotFound = () => (
   <div className="flex flex-col items-center justify-center h-[60vh] text-center">
@@ -75,6 +74,7 @@ export default function App() {
             <Route path="developer" element={<Developer />} />
             <Route path="pengaturan" element={<Pengaturan />} />
             <Route path="qc" element={<QCHome />} />
+            <Route path="maintenance" element={<MaintenanceHome />} />
             <Route path="*" element={<NotFound />} />
             <Route path="/so" element={<DashboardSO />} />
             <Route path="/so/create" element={<CreateSO />} />

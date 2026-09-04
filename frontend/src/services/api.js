@@ -37,6 +37,9 @@ const ROUTES = {
   GET_CHAT_MESSAGES:    { method: 'GET',  path: (d) => `/chat/${encodeURIComponent(d.conversationId)}/messages${d.afterId ? `?afterId=${d.afterId}` : ''}` },
   SEND_CHAT_MESSAGE:    { method: 'POST', path: (d) => `/chat/${encodeURIComponent(d.conversationId)}/messages` },
 
+  // === Modul Maintenance ===
+  GET_MAINTENANCE_TEAM:  { method: 'GET',  path: () => '/maintenance/team' },
+
   // === Modul QC Traceability ===
   QC_LIST_ITEMS:        { method: 'GET',  path: (d) => `/qc/items?search=${encodeURIComponent(d.search || '')}&type=${encodeURIComponent(d.type || 'all')}` },
   QC_CREATE_ITEM:       { method: 'POST', path: () => '/qc/items' },
