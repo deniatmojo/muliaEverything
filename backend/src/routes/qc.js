@@ -42,6 +42,7 @@ const publikView = (row) => ({
   status_item: row.status_item,
   qc_process: row.qc_process,
   inspector: row.inspector,
+  note: row.note || null,
   locked: row.scan_updated_at !== null,
   scan_updated_at: row.scan_updated_at,
   created_at: row.created_at,
@@ -73,7 +74,7 @@ router.post('/public/:code/verify-pin', async (req, res) => {
 
 // Update status via halaman scan: wajib PIN benar, hanya sekali (terkunci permanen)
 router.post('/public/:code/update', async (req, res) => {
-  const { pin, inspector, status_item, qc_process } = req.body || {};
+  const { pin, inspector, status_item, qc_process, note = '' } = req.body || {};
   if (!pin) return fail(res, 'PIN wajib diisi.', 422);
   if (!inspector || !inspector.trim()) return fail(res, 'Nama Inspector wajib diisi.', 422);
   if (!STATUS_ITEMS.includes(status_item)) return fail(res, 'Status Item tidak valid.', 422);
@@ -90,10 +91,10 @@ router.post('/public/:code/update', async (req, res) => {
   if (!pinBenar) return fail(res, 'PIN salah. Silakan coba lagi.', 401);
 
   await pool.query(
-    'UPDATE qc_items SET status_item = ?, qc_process = ?, inspector = ?, scan_updated_at = NOW(), scan_updated_by = ? WHERE id = ?',
-    [status_item, qc_process, inspector.trim(), inspector.trim(), row.id]
+    'UPDATE qc_items SET status_item = ?, qc_process = ?, inspector = ?, note = ?, scan_updated_at = NOW(), scan_updated_by = ? WHERE id = ?',
+    [status_item, qc_process, inspector.trim(), note.trim() || null, inspector.trim(), row.id]
   );
-  await recordLog(null, 'QC_SCAN_UPDATE', `Item QC ${row.code} diupdate via scan oleh ${inspector.trim()}`);
+  await recordLog(null, 'QC_SCAN_UPDATE', `Inspector ${inspector.trim()} me-update item QC ${row.code} (tipe ${row.type}) via halaman scan: Status Item="${status_item}", QC Process="${qc_process}"`);
   return ok(res, 'Data QC berhasil diperbarui!');
 });
 
@@ -136,7 +137,7 @@ router.get('/team', async (req, res) => {
 
 // Buat item baru (generate barcode)
 router.post('/items', async (req, res) => {
-  const { type, data = {}, pin, status_item = 'In Checking', qc_process = 'Unchecking', inspector = '' } = req.body || {};
+  const { type, data = {}, pin, status_item = 'In Checking', qc_process = 'Unchecking', inspector = '', note = '' } = req.body || {};
 
   if (!['bundle', 'coil', 'packaging'].includes(type)) return fail(res, 'Tipe label tidak valid.', 422);
   if (!pin || !/^\d{4,6}$/.test(String(pin))) return fail(res, 'PIN harus berupa angka 4-6 digit.', 422);
@@ -154,42 +155,47 @@ router.post('/items', async (req, res) => {
   const pin_hash = bcrypt.hashSync(String(pin), 10);
 
   await pool.query(
-    'INSERT INTO qc_items (id, code, type, data, pin_hash, status_item, qc_process, inspector, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, code, type, JSON.stringify(bersih), pin_hash, status_item, qc_process, inspector || null, req.user?.id || null]
+    'INSERT INTO qc_items (id, code, type, data, pin_hash, status_item, qc_process, inspector, note, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, code, type, JSON.stringify(bersih), pin_hash, status_item, qc_process, inspector || null, note.trim() || null, req.user?.id || null]
   );
-  await recordLog(req.user?.id, 'QC_CREATE', `Barcode QC ${code} (tipe ${type}) dibuat`);
+  await recordLog(req.user?.id, 'QC_CREATE', `${req.user?.nama || 'Admin'} membuat barcode QC ${code} (tipe ${type}, item: ${bersih.product_name || bersih.no_coil || '-'})`);
   const [[row]] = await pool.query('SELECT * FROM qc_items WHERE id = ?', [id]);
   return ok(res, 'Barcode QC berhasil dibuat', publikView(row), 201);
 });
 
 // Edit item via halaman induk (bebas, tanpa PIN; PIN opsional diganti)
 router.put('/items/:id', async (req, res) => {
-  const { data, pin, status_item, qc_process, inspector } = req.body || {};
+  const { data, pin, status_item, qc_process, inspector, note } = req.body || {};
 
   const [[row]] = await pool.query('SELECT * FROM qc_items WHERE id = ?', [req.params.id]);
   if (!row) return fail(res, 'Item QC tidak ditemukan', 404);
 
   const updates = [];
   const params = [];
-  if (data !== undefined) updates.push('data = ?'), params.push(JSON.stringify(sanitizeData(row.type, data)));
-  if (status_item !== undefined) {
+  const perubahan = [];
+  if (data !== undefined) { updates.push('data = ?'), params.push(JSON.stringify(sanitizeData(row.type, data))); perubahan.push('data item'); }
+  if (status_item !== undefined && status_item !== row.status_item) {
     if (!STATUS_ITEMS.includes(status_item)) return fail(res, 'Status Item tidak valid.', 422);
     updates.push('status_item = ?'), params.push(status_item);
+    perubahan.push(`Status Item "${row.status_item}" -> "${status_item}"`);
   }
-  if (qc_process !== undefined) {
+  if (qc_process !== undefined && qc_process !== row.qc_process) {
     if (!QC_PROCESSES.includes(qc_process)) return fail(res, 'QC Process tidak valid.', 422);
     updates.push('qc_process = ?'), params.push(qc_process);
+    perubahan.push(`QC Process "${row.qc_process}" -> "${qc_process}"`);
   }
-  if (inspector !== undefined) updates.push('inspector = ?'), params.push(inspector || null);
+  if (inspector !== undefined) { updates.push('inspector = ?'), params.push(inspector || null); perubahan.push(`Inspector "${row.inspector || '-'}" -> "${inspector || '-'}"`); }
+  if (note !== undefined) { updates.push('note = ?'), params.push(note || null); if ((note || '') !== (row.note || '')) perubahan.push('catatan inspeksi'); }
   if (pin) {
     if (!/^\d{4,6}$/.test(String(pin))) return fail(res, 'PIN harus berupa angka 4-6 digit.', 422);
     updates.push('pin_hash = ?'), params.push(bcrypt.hashSync(String(pin), 10));
+    perubahan.push('ganti PIN akses');
   }
   if (updates.length === 0) return fail(res, 'Tidak ada perubahan yang dikirim.', 422);
 
   params.push(req.params.id);
   await pool.query(`UPDATE qc_items SET ${updates.join(', ')} WHERE id = ?`, params);
-  await recordLog(req.user?.id, 'QC_EDIT', `Item QC ${row.code} diedit via halaman induk`);
+  await recordLog(req.user?.id, 'QC_EDIT', `${req.user?.nama || 'Admin'} mengedit item QC ${row.code}${perubahan.length ? ': ' + perubahan.join(', ') : ''}`);
   const [[baru]] = await pool.query('SELECT * FROM qc_items WHERE id = ?', [req.params.id]);
   return ok(res, 'Item QC berhasil diperbarui', publikView(baru));
 });

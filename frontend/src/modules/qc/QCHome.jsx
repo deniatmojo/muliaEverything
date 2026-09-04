@@ -214,7 +214,7 @@ export default function QCHome() {
   const openEdit = (item) => {
     setEditItem(item);
     setFormType(item.type);
-    setFormValues({ ...(item.data || {}), status_item: item.status_item, qc_process: item.qc_process, inspector: item.inspector || '' });
+    setFormValues({ ...(item.data || {}), status_item: item.status_item, qc_process: item.qc_process, inspector: item.inspector || '', note: item.note || '' });
     setFormPin('');
     setFormOpen(true);
   };
@@ -235,12 +235,15 @@ export default function QCHome() {
 
     setIsSubmitting(true);
     try {
+      // Pisahkan field umum dari data dinamis per tipe
+      const { status_item, qc_process, inspector, note, ...dataFields } = formValues;
       const payload = {
         type: formType,
-        data: formValues,
-        status_item: formValues.status_item || 'In Checking',
-        qc_process: formValues.qc_process || 'Unchecking',
-        inspector: formValues.inspector || '',
+        data: dataFields,
+        status_item: status_item || 'In Checking',
+        qc_process: qc_process || 'Unchecking',
+        inspector: inspector || '',
+        note: note || '',
         ...(formPin ? { pin: formPin } : {}),
       };
       const res = editItem
@@ -301,12 +304,13 @@ export default function QCHome() {
       off.appendChild(clone);
       document.body.appendChild(off);
 
-      const canvas = await html2canvas(off, { scale: 4, backgroundColor: '#ffffff' });
+      const canvas = await html2canvas(off, { scale: 3, backgroundColor: '#ffffff' });
       document.body.removeChild(off);
 
       const tinggiMm = (canvas.height / canvas.width) * paperMm;
       const pdf = new jsPDF({ unit: 'mm', format: [paperMm, tinggiMm], orientation: 'portrait' });
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, paperMm, tinggiMm);
+      // JPEG 92% jauh lebih ringan dari PNG (label dominan putih/hitam), tetap tajam untuk QR & teks
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, paperMm, tinggiMm);
       pdf.save(`Label-${previewItem.code}.pdf`);
     } catch (err) {
       showNotice('Gagal membuat PDF: ' + err.message, 'error');
@@ -342,8 +346,9 @@ export default function QCHome() {
         </div>
       </div>
 
-      {/* ==== NAVIGASI PILL OVAL TRANSPARAN ==== */}
-      <div className="sticky top-0 z-40 -mx-4 lg:-mx-8 px-4 lg:px-8 pt-1 pb-3 print:hidden">
+      {/* ==== NAVIGASI PILL OVAL TRANSPARAN ====
+           z-10 (di bawah overlay z-20 & sidebar z-30) agar TERTUTUP sidebar saat burger menu mobile dibuka */}
+      <div className="sticky top-0 z-10 -mx-4 lg:-mx-8 px-4 lg:px-8 pt-1 pb-3 print:hidden">
         <nav className="w-full max-w-md mx-auto rounded-full px-2 py-1.5 flex items-center justify-center shadow-sm bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-1 sm:gap-2 text-sm font-medium tracking-wide">
             {[
@@ -448,6 +453,9 @@ export default function QCHome() {
                     {item.scan_updated_at && (
                       <div className="text-[10px] text-gray-400 dark:text-gray-500">Dicek: {fmtCheckDate(item)}</div>
                     )}
+                    {item.note && (
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500 max-w-[220px] truncate" title={item.note}>📝 {item.note}</div>
+                    )}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     {new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -492,7 +500,7 @@ export default function QCHome() {
 
       {/* ==== FAB TOMBOL BUAT BARCODE ==== */}
       {tab === 'barcode' && (
-        <div className="fixed bottom-6 left-6 lg:left-[19.5rem] group z-30 print:hidden">
+        <div className="fixed bottom-6 left-6 lg:left-[19.5rem] group z-10 print:hidden">
           <div className="absolute bottom-12 left-0 pb-4 flex flex-col-reverse gap-3 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all duration-300 delay-100 group-hover:delay-0 transform translate-y-4 group-hover:translate-y-0 w-max">
             {Object.entries(TYPE_META).map(([key, meta]) => (
               <button
@@ -572,6 +580,10 @@ export default function QCHome() {
                 <label className="block mb-3">
                   <div className="text-xs font-bold text-gray-500 dark:text-gray-300 mb-1">Inspector QC</div>
                   <input type="text" className={inputCls} placeholder="Kosongkan jika belum" value={formValues.inspector || ''} onChange={(e) => setVal('inspector', e.target.value)} />
+                </label>
+                <label className="block mb-3 col-span-2">
+                  <div className="text-xs font-bold text-gray-500 dark:text-gray-300 mb-1">Catatan Inspeksi</div>
+                  <textarea rows={2} className={inputCls} placeholder="Catatan dari inspector saat pengecekan (opsional)" value={formValues.note || ''} onChange={(e) => setVal('note', e.target.value)} />
                 </label>
                 <label className="block mb-3 col-span-2">
                   <div className="text-xs font-bold text-gray-500 dark:text-gray-300 mb-1">

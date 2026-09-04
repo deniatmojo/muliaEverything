@@ -34,7 +34,7 @@ export default function QcScan() {
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const [form, setForm] = useState({ inspector: '', status_item: 'In Checking', qc_process: 'Unchecking' });
+  const [form, setForm] = useState({ inspector: '', status_item: 'In Checking', qc_process: 'Unchecking', note: '' });
 
   const loadItem = async () => {
     setLoadState('loading');
@@ -42,7 +42,7 @@ export default function QcScan() {
       const res = await callApi('QC_SCAN_GET', { code });
       if (res.status === 'success') {
         setItem(res.data);
-        setForm({ inspector: res.data.inspector || '', status_item: res.data.status_item, qc_process: res.data.qc_process });
+        setForm({ inspector: res.data.inspector || '', status_item: res.data.status_item, qc_process: res.data.qc_process, note: res.data.note || '' });
         setLoadState('ready');
       } else {
         setErrorMsg(res.message);
@@ -85,6 +85,7 @@ export default function QcScan() {
         inspector: form.inspector,
         status_item: form.status_item,
         qc_process: form.qc_process,
+        note: form.note || '',
       });
       if (res.status === 'success') {
         setSuccess(true);
@@ -243,6 +244,11 @@ export default function QcScan() {
                               Dicek: {new Date(item.scan_updated_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })}
                             </div>
                           )}
+                          {item.note && (
+                            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 text-xs text-gray-600 dark:text-gray-300 italic whitespace-pre-wrap">
+                              "{item.note}"
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="font-medium text-gray-500 text-sm italic flex items-center gap-1">
@@ -331,6 +337,10 @@ export default function QcScan() {
                     <option value="Unchecking">Unchecking</option>
                     <option value="Passes">Passes</option>
                   </select>
+                </label>
+                <label className="block">
+                  <div className="text-xs font-bold text-gray-500 mb-1">Catatan Inspeksi <span className="text-gray-400 font-normal">(opsional)</span></div>
+                  <textarea rows={3} className={inputCls} placeholder="Catatan hasil pengecekan, temuan, atau keterangan lain..." value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
                 </label>
                 {pinError && <p className="text-red-500 text-xs font-medium">{pinError}</p>}
               </div>
