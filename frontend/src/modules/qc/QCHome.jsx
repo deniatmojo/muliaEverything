@@ -36,6 +36,14 @@ const statusOptionsFor = (type, currentValue) => {
   return list.includes(currentValue) ? list : [currentValue, ...list];
 };
 
+// FG lama masih memakai istilah lama; dinormalisasi ke padanan barunya supaya tidak dobel di dropdown
+const normalizeFgStatus = (type, status) => {
+  if (type !== 'bundle') return status;
+  if (status === 'In Checking') return 'InChecking';
+  if (status === 'Ready to Use') return 'Ready to Send';
+  return status;
+};
+
 // Field dinamis per tipe (mengikuti desain mockup)
 const BUNDLE_FIELDS = [
   { k: 'customer', label: 'Customer', req: true, ph: 'PT PRATAMA EKA...' },
@@ -235,7 +243,7 @@ export default function QCHome() {
   const openEdit = (item) => {
     setEditItem(item);
     setFormType(item.type);
-    setFormValues({ ...(item.data || {}), status_item: item.status_item, qc_process: item.qc_process, inspector: item.inspector || '', note: item.note || '' });
+    setFormValues({ ...(item.data || {}), status_item: normalizeFgStatus(item.type, item.status_item), qc_process: item.qc_process, inspector: item.inspector || '', note: item.note || '' });
     setFormPin('');
     setFormOpen(true);
   };

@@ -34,6 +34,14 @@ const statusOptionsFor = (type, currentValue) => {
   return list.includes(currentValue) ? list : [currentValue, ...list];
 };
 
+// FG lama masih memakai istilah lama; dinormalisasi ke padanan barunya supaya tidak dobel di dropdown
+const normalizeFgStatus = (type, status) => {
+  if (type !== 'bundle') return status;
+  if (status === 'In Checking') return 'InChecking';
+  if (status === 'Ready to Use') return 'Ready to Send';
+  return status;
+};
+
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-aira-cyan';
 
 export default function QcScan() {
@@ -57,7 +65,7 @@ export default function QcScan() {
       const res = await callApi('QC_SCAN_GET', { code });
       if (res.status === 'success') {
         setItem(res.data);
-        setForm({ inspector: res.data.inspector || '', status_item: res.data.status_item, qc_process: res.data.qc_process, note: res.data.note || '' });
+        setForm({ inspector: res.data.inspector || '', status_item: normalizeFgStatus(res.data.type, res.data.status_item), qc_process: res.data.qc_process, note: res.data.note || '' });
         setLoadState('ready');
       } else {
         setErrorMsg(res.message);
