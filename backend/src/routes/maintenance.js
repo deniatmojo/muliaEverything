@@ -11,7 +11,7 @@ router.use(requireAuth);
 // (Developer tidak ditampilkan, sama seperti pola QC Team)
 router.get('/team', async (req, res) => {
   const [rows] = await pool.query(
-    `SELECT u.id, u.nama, u.email, u.role, u.phone, u.avatar_url
+    `SELECT u.id, u.nama, u.username, u.email, u.role, u.phone, u.avatar_url
      FROM users u
      JOIN roles r ON r.nama_role = u.role
      WHERE u.status = 'active'

@@ -6,7 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Activity, Wrench, LayoutDashboard, Zap, Gauge, BatteryCharging, Sun,
   Camera, Coins, TrendingUp, TrendingDown, ChevronDown, Check,
-  Factory, Bell, Loader2, Users, Calculator
+  Factory, Bell, Loader2, Users, Calculator, AtSign, Mail, Phone
 } from 'lucide-react';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
@@ -325,65 +325,59 @@ function TimMaintenance() {
   }, []);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
-            <Users size={20} className="text-aira-cyan" /> Tim Maintenance
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Pengguna aktif yang role-nya memiliki akses menu Maintenance (selain Developer).
-          </p>
-        </div>
-        <span className="bg-aira-cyan/10 text-aira-cyan text-xs font-bold px-3 py-1 rounded-full">
-          {isLoading ? '...' : `${team.length} Anggota`}
-        </span>
-      </div>
+    <div className="pt-2">
+      <h2 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+        <Users size={22} className="text-aira-cyan" /> Direktori Tim Maintenance
+      </h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 mb-6">
+        Pengguna yang memiliki akses modul Maintenance (diatur lewat RBAC).
+      </p>
 
       {isLoading ? (
-        <div className="p-8"><Loader2 className="w-6 h-6 animate-spin mx-auto text-aira-cyan" /></div>
+        <div className="py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto text-aira-cyan" /></div>
       ) : error ? (
-        <p className="p-4 text-center text-red-500 text-sm">{error}</p>
-      ) : team.length === 0 ? (
-        <div className="p-8 text-center">
-          <Wrench size={32} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
-          <p className="text-gray-500 dark:text-gray-400 text-sm">
-            Belum ada anggota tim. Berikan akses menu <strong>Maintenance</strong> pada suatu role di halaman Developer,
-            lalu tetapkan role itu kepada pengguna.
-          </p>
-        </div>
+        <p className="py-6 text-center text-red-500 text-sm">{error}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50 dark:text-gray-400">
-              <tr>
-                <th className="px-4 py-3 rounded-l-lg">Nama</th>
-                <th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Kontak</th>
-                <th className="px-4 py-3 rounded-r-lg">Foto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {team.map(u => (
-                <tr key={u.id} className="border-b border-gray-100 dark:border-gray-700">
-                  <td className="px-4 py-3 font-semibold text-gray-800 dark:text-white">{u.nama}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <span className="bg-aira-cyan/10 text-aira-cyan text-xs font-semibold px-2.5 py-1 rounded-full">{u.role}</span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{u.phone || '-'}</td>
-                  <td className="px-4 py-3">
-                    {u.avatar_url
-                      ? <img src={u.avatar_url} alt={u.nama} className="w-8 h-8 rounded-full object-cover" />
-                      : <div className="w-8 h-8 rounded-full bg-aira-navy dark:bg-aira-cyan text-white dark:text-gray-900 flex items-center justify-center text-xs font-bold">
-                          {u.nama?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                        </div>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {team.length === 0 ? (
+            <div className="col-span-full bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 text-center py-10 px-6">
+              <Wrench size={30} className="mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+              <p className="text-gray-500 dark:text-gray-400 text-sm">
+                Belum ada anggota tim selain Developer. Berikan akses menu <strong>Maintenance</strong> pada suatu role
+                di halaman Developer, lalu tetapkan role itu kepada pengguna.
+              </p>
+            </div>
+          ) : team.map(u => (
+            <div key={u.id} className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition">
+              <div className="flex items-center gap-4">
+                {u.avatar_url ? (
+                  <img src={u.avatar_url} alt={u.nama} className="w-12 h-12 rounded-full object-cover border border-aira-cyan/20" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-aira-cyan/10 dark:bg-aira-cyan/20 text-aira-navy dark:text-aira-cyan flex items-center justify-center font-bold text-lg border border-aira-cyan/20">
+                    {(u.nama || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="font-bold text-gray-800 dark:text-white truncate">{u.nama}</div>
+                  <div className="text-xs font-semibold text-aira-cyan mt-0.5">{u.role}</div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <AtSign size={13} className="text-aira-cyan flex-shrink-0" />
+                  <span className="truncate">{u.username ? `@${u.username}` : '-'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <Mail size={13} className="text-aira-cyan flex-shrink-0" />
+                  <span className="truncate">{u.email || '-'}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                  <Phone size={13} className="text-aira-cyan flex-shrink-0" />
+                  <span className="truncate">{u.phone || '-'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

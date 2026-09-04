@@ -4,7 +4,7 @@ import { callApi } from '../../services/api';
 import {
   Search, Filter, Plus, Pen, Printer, X, QrCode, LayoutGrid,
   Boxes, Layers, Package, PieChart, Users, Loader2, Lock, Download,
-  CircleCheck, UserCheck, UserX, PackageOpen,
+  CircleCheck, UserCheck, UserX, PackageOpen, Mail, AtSign, Phone,
 } from 'lucide-react';
 
 // ============ KONFIGURASI TIPE LABEL ============
@@ -513,12 +513,30 @@ export default function QCHome() {
             ) : team.map((m) => (
               <div key={m.id} className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-indigo-800">
-                    {(m.nama || 'U').charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-800 dark:text-white">{m.nama}</div>
+                  {m.avatar_url ? (
+                    <img src={m.avatar_url} alt={m.nama} className="w-12 h-12 rounded-full object-cover border border-indigo-100 dark:border-indigo-800" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-indigo-800">
+                      {(m.nama || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-bold text-gray-800 dark:text-white truncate">{m.nama}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{m.role}</div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <AtSign size={13} className="text-indigo-400 flex-shrink-0" />
+                    <span className="truncate">{m.username ? `@${m.username}` : '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <Mail size={13} className="text-indigo-400 flex-shrink-0" />
+                    <span className="truncate">{m.email || '-'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <Phone size={13} className="text-indigo-400 flex-shrink-0" />
+                    <span className="truncate">{m.phone || '-'}</span>
                   </div>
                 </div>
               </div>
