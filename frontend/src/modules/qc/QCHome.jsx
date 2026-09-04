@@ -49,6 +49,12 @@ const fmtCheckDate = (item) => item?.scan_updated_at
   ? new Date(item.scan_updated_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })
   : '-';
 
+// SEMENTARA: baris DATE QC CHECK di label tercetak memakai tanggal pembuatan QR,
+// bukan tanggal pengecekan inspector (permintaan revisi, menyimpang dari aturan sementara)
+const fmtLabelDate = (item) => item?.created_at
+  ? new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })
+  : '-';
+
 // Logo segitiga MULIA 41 untuk label cetak
 const MuliaLogo = ({ size = 30 }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" style={{ marginRight: 6, flexShrink: 0 }}>
@@ -66,7 +72,7 @@ function BundleLabel({ item, qrValue }) {
     ['CUSTOMER', d.customer], ['SO NUMBER', d.so_number], ['PRODUCT NAME', d.product_name],
     ['QTY (PCS)', d.qty], ['DIMENSION (mm)', d.dimension], ['COLOR', d.color],
     ['BUNDLE NO.', d.bundle_no], ['TOTAL BUNDLES', d.total_bundles],
-    ['DATE QC CHECK', fmtCheckDate(item)],
+    ['DATE QC CHECK', fmtLabelDate(item)],
   ];
   const td = { border: '1px solid #000', padding: '5px', textTransform: 'uppercase', fontSize: 10 };
   return (
@@ -103,7 +109,7 @@ function BundleLabel({ item, qrValue }) {
 
 function CoilLabel({ item, qrValue }) {
   const d = item.data || {};
-  const rows = [['TYPE COIL', d.type_coil], ['BERAT', `${d.berat || '-'} KG`], ['NO. COIL', d.no_coil], ['SUPPLIER', d.supplier], ['DATE QC CHECK', fmtCheckDate(item)]];
+  const rows = [['TYPE COIL', d.type_coil], ['BERAT', `${d.berat || '-'} KG`], ['NO. COIL', d.no_coil], ['SUPPLIER', d.supplier], ['DATE QC CHECK', fmtLabelDate(item)]];
   return (
     <div style={{ background: '#fff', padding: 14, color: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', borderBottom: '3px solid #000', paddingBottom: 10, marginBottom: 16 }}>
