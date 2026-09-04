@@ -16,9 +16,24 @@ const TYPE_META = {
 
 const STATUS_ITEM_BADGE = {
   'Ready to Use': 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+  'Ready to Send': 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
   'In Checking': 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  'InChecking': 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  'Hold': 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   'Reject': 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
   'Stock': 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+};
+
+// Opsi Status Item: FG Bundle punya daftar sendiri, tipe lain memakai daftar umum
+const STATUS_ITEM_OPTIONS = {
+  bundle: ['Ready to Send', 'InChecking', 'Hold', 'Stock'],
+  coil: ['Ready to Use', 'In Checking', 'Reject', 'Stock'],
+  packaging: ['Ready to Use', 'In Checking', 'Reject', 'Stock'],
+};
+const statusOptionsFor = (type, currentValue) => {
+  const list = STATUS_ITEM_OPTIONS[type] || STATUS_ITEM_OPTIONS.coil;
+  // nilai lama yang tak ada di daftar baru tetap tampil agar data tak "hilang" dari form
+  return list.includes(currentValue) ? list : [currentValue, ...list];
 };
 
 // Field dinamis per tipe (mengikuti desain mockup)
@@ -212,7 +227,7 @@ export default function QCHome() {
     if (type === 'packaging') return showNotice('Tipe Packaging Upright akan tersedia segera.', 'error');
     setEditItem(null);
     setFormType(type);
-    setFormValues({ status_item: 'In Checking', qc_process: 'Unchecking', shift: '1' });
+    setFormValues({ status_item: type === 'bundle' ? 'InChecking' : 'In Checking', qc_process: 'Unchecking', shift: '1' });
     setFormPin('');
     setFormOpen(true);
   };
@@ -572,8 +587,8 @@ export default function QCHome() {
                 {/* Status awal / status item */}
                 <label className="block mb-3">
                   <div className="text-xs font-bold text-gray-500 dark:text-gray-300 mb-1">Status Item <span className="text-red-500">*</span></div>
-                  <select className={`${inputCls} font-medium`} value={formValues.status_item || 'In Checking'} onChange={(e) => setVal('status_item', e.target.value)}>
-                    {Object.keys(STATUS_ITEM_BADGE).map((s) => <option key={s} value={s}>{s}</option>)}
+                  <select className={`${inputCls} font-medium`} value={formValues.status_item || (formType === 'bundle' ? 'InChecking' : 'In Checking')} onChange={(e) => setVal('status_item', e.target.value)}>
+                    {statusOptionsFor(formType, formValues.status_item).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
                 <label className="block mb-3">

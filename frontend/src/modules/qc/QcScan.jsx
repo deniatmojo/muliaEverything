@@ -8,15 +8,30 @@ import {
 
 const STATUS_ITEM_BADGE = {
   'Ready to Use': 'bg-green-100 text-green-700',
+  'Ready to Send': 'bg-green-100 text-green-700',
   'In Checking': 'bg-blue-100 text-blue-700',
+  'InChecking': 'bg-blue-100 text-blue-700',
+  'Hold': 'bg-amber-100 text-amber-700',
   'Reject': 'bg-red-100 text-red-700',
   'Stock': 'bg-purple-100 text-purple-700',
 };
 const STATUS_ACCENT = {
   'Ready to Use': 'bg-green-500',
+  'Ready to Send': 'bg-green-500',
   'In Checking': 'bg-blue-500',
+  'InChecking': 'bg-blue-500',
+  'Hold': 'bg-amber-500',
   'Reject': 'bg-red-500',
   'Stock': 'bg-purple-500',
+};
+// Status khusus per tipe: FG Bundle berbeda dari Koil
+const STATUS_ITEM_OPTIONS = {
+  bundle: ['Ready to Send', 'InChecking', 'Hold', 'Stock'],
+  coil: ['Ready to Use', 'In Checking', 'Reject', 'Stock'],
+};
+const statusOptionsFor = (type, currentValue) => {
+  const list = STATUS_ITEM_OPTIONS[type] || STATUS_ITEM_OPTIONS.coil;
+  return list.includes(currentValue) ? list : [currentValue, ...list];
 };
 
 const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-aira-cyan';
@@ -328,7 +343,7 @@ export default function QcScan() {
                 <label className="block">
                   <div className="text-xs font-bold text-gray-500 mb-1">Status Item <span className="text-red-500">*</span></div>
                   <select className={`${inputCls} font-medium`} value={form.status_item} onChange={(e) => setForm({ ...form, status_item: e.target.value })}>
-                    {Object.keys(STATUS_ITEM_BADGE).map((s) => <option key={s} value={s}>{s}</option>)}
+                    {statusOptionsFor(item.type, form.status_item).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </label>
                 <label className="block">

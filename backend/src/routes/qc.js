@@ -7,7 +7,12 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-const STATUS_ITEMS = ['Ready to Use', 'In Checking', 'Reject', 'Stock'];
+const STATUS_ITEMS = [
+  // Koil (dan umum)
+  'Ready to Use', 'In Checking', 'Reject', 'Stock',
+  // Khusus Bundle Info - FG
+  'Ready to Send', 'InChecking', 'Hold',
+];
 const QC_PROCESSES = ['Unchecking', 'Passes'];
 
 // Field wajib per tipe label
