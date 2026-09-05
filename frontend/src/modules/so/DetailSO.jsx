@@ -4,6 +4,7 @@ import { callApi } from '../../services/api';
 import {
   ArrowLeft,
   Pencil,
+  Upload,
   MessageSquare,
   Send,
   Building2,
@@ -202,7 +203,10 @@ const InfoField = ({ icon: Icon, label, value, mono = false, className = '' }) =
 // ---------------------------------------------------------------------------
 // Block 1 — Detail SO
 // ---------------------------------------------------------------------------
-const HeroBlock = ({ id, onNavigateBack, onJump, refs }) => (
+const fmtDateID = (d) => (d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-');
+const fmtIDRShort = (n) => (n ? 'Rp ' + new Intl.NumberFormat('id-ID').format(n) : '-');
+
+const HeroBlock = ({ id, so, onNavigateBack, onJump, refs, onEdit, onUpload }) => (
   <Panel className="!p-0 overflow-hidden h-full">
     <div className="px-6 sm:px-7 pt-5 pb-6">
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -213,41 +217,63 @@ const HeroBlock = ({ id, onNavigateBack, onJump, refs }) => (
           <ArrowLeft size={16} />
         </button>
         <div className="flex items-center gap-2 shrink-0">
-          <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${STATUS_STYLES['In Progress']}`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#0084C9] dark:bg-sky-400 animate-pulse" /> In Progress
-          </span>
-          <button className={`flex items-center gap-1.5 text-white px-3.5 py-2 rounded-xl font-medium text-sm shadow-sm transition-all duration-200 active:scale-[0.98] ${ACCENTS.navy.solid}`}>
+          {so?.active_version_label && (
+            <span className="hidden sm:inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-[#0F3B6C] dark:text-cyan-400">
+              V.{so.active_version_label} aktif
+            </span>
+          )}
+          {so?.has_pending_change ? (
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Menunggu Approval
+            </span>
+          ) : (
+            <span className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${STATUS_STYLES['In Progress']}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0084C9] dark:bg-sky-400 animate-pulse" /> In Progress
+            </span>
+          )}
+          <button
+            onClick={onEdit}
+            disabled={so?.has_pending_change}
+            title={so?.has_pending_change ? 'Menunggu approval perubahan lain' : 'Edit data SO'}
+            className={`flex items-center gap-1.5 text-white px-3.5 py-2 rounded-xl font-medium text-sm shadow-sm transition-all duration-200 active:scale-[0.98] ${so?.has_pending_change ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : ACCENTS.navy.solid}`}>
             <Pencil size={13} /> Edit
+          </button>
+          <button
+            onClick={onUpload}
+            disabled={so?.has_pending_change}
+            title={so?.has_pending_change ? 'Menunggu approval perubahan lain' : 'Upload BOQ versi baru'}
+            className={`flex items-center gap-1.5 text-white px-3.5 py-2 rounded-xl font-medium text-sm shadow-sm transition-all duration-200 active:scale-[0.98] ${so?.has_pending_change ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : ACCENTS.blue.solid || ACCENTS.navy.solid}`}>
+            <Upload size={13} /> Upload
           </button>
         </div>
       </div>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Hotel Mulia</h1>
-      <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Renovasi Kamar Suite</p>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{so?.customer || 'Customer'}</h1>
+      <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">{so?.project_name || 'Project'}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 mt-5">
-        <InfoField icon={Building2} label="Nama PT" value="PT Mulia Graha Perkasa" />
-        <InfoField icon={Hash} label="Nomor Project" value="PRJ/2026/07/0142" mono />
+        <InfoField icon={Building2} label="Nama PT" value={so?.company || '-'} />
+        <InfoField icon={Hash} label="Nomor Project" value={so?.project_number || '-'} mono />
         <InfoField icon={Hash} label="Nomor SO" value={id} mono />
-        <InfoField icon={UserRound} label="Nama Sales" value="Rendra Wijaya" />
-        <InfoField icon={MapPin} label="Alamat" value="Jl. Asia Afrika No. 8, Senayan, Jakarta Pusat" className="sm:col-span-2 lg:col-span-4" />
+        <InfoField icon={UserRound} label="Nama Sales" value={so?.sales_name || '-'} />
+        <InfoField icon={MapPin} label="Alamat" value={so?.address || '-'} className="sm:col-span-2 lg:col-span-4" />
       </div>
     </div>
 
     <div className="px-6 sm:px-7 py-6 border-t border-gray-100 dark:border-gray-700 flex-1">
       <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Detail Lainnya</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-        <InfoField icon={Boxes} label="Total Pallet Posisi" value="18 Pallet" />
-        <InfoField icon={Wallet} label="Potential Budget Material" value="Rp 842.500.000" />
-        <InfoField icon={Rocket} label="Start Produksi" value="18 Juli 2026" />
-        <InfoField icon={CalendarDays} label="Tgl Kiriman Pertama" value="10 Agustus 2026" />
-        <InfoField icon={CalendarDays} label="Tgl Mulai Instalasi" value="15 Agustus 2026" />
-        <InfoField icon={BadgeCheck} label="Target Selesai Instalasi" value="30 Agustus 2026" />
+        <InfoField icon={Boxes} label="Total Pallet Posisi" value={so?.pallet_count != null ? String(so.pallet_count) : '-'} />
+        <InfoField icon={Wallet} label="Potential Budget Material" value={fmtIDRShort(so?.budget_idr)} />
+        <InfoField icon={Rocket} label="Start Produksi" value={fmtDateID(so?.start_production)} />
+        <InfoField icon={CalendarDays} label="Tgl Kiriman Pertama" value={fmtDateID(so?.first_delivery)} />
+        <InfoField icon={CalendarDays} label="Tgl Mulai Instalasi" value={fmtDateID(so?.start_installation)} />
+        <InfoField icon={BadgeCheck} label="Target Selesai Instalasi" value={fmtDateID(so?.target_installation)} />
       </div>
       <div className="mt-5 flex items-start gap-2.5">
         <StickyNote size={15} className="text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
         <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
           <span className="font-semibold text-gray-700 dark:text-gray-200">Keterangan: </span>
-          Klien meminta sample warna finishing dikonfirmasi ulang sebelum tahap produksi lantai 5 dimulai. Koordinasi dengan tim sales diperlukan sebelum tanggal 5 Agustus.
+          {so?.description || '-'}
         </p>
       </div>
     </div>
@@ -601,6 +627,17 @@ const DetailSO = () => {
   const navigate = useNavigate();
   const soId = id || 'SO-2026-0789';
 
+  // Data master SO (dari backend; bila SO belum ada di DB, tampil nilai default)
+  const [soData, setSoData] = useState(null);
+  useEffect(() => {
+    callApi('SO_DETAIL', { soId }).then((res) => {
+      if (res.status === 'success') {
+        const activeVer = (res.data.versions || []).find((v) => v.id === res.data.so.active_version_id);
+        setSoData({ ...res.data.so, active_version_label: activeVer?.version_no ?? null });
+      }
+    });
+  }, [soId]);
+
   // Catatan per modul, tersimpan di backend (kanal chat so_id#modul)
   const [notes, setNotes] = useState({
     so: [],
@@ -673,7 +710,8 @@ const DetailSO = () => {
           {/* BARIS 1: SO (Hero Block) */}
           <div className="flex flex-col xl:flex-row gap-5 items-stretch">
             <div className="flex-1 min-w-0 flex flex-col">
-              <HeroBlock id={soId} onNavigateBack={() => navigate('/so')} onJump={jumpTo} refs={{ produksi: produksiRef, pengiriman: pengirimanRef, instalasi: instalasiRef }} />
+              <HeroBlock id={soId} so={soData} onNavigateBack={() => navigate('/so')} onJump={jumpTo} refs={{ produksi: produksiRef, pengiriman: pengirimanRef, instalasi: instalasiRef }}
+                onEdit={() => navigate(`/so/${soId}/edit`)} onUpload={() => navigate(`/so/${soId}/upload`)} />
             </div>
             <div className="w-full xl:w-[380px] shrink-0 flex flex-col">
               <NoteCard moduleKey="so" title="SO" icon={ClipboardList} accent={ACCENTS.navy} notes={notes.so} onSend={handleSendNote} directory={directory} />

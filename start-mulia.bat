@@ -5,15 +5,16 @@ echo   MENYALAKAN PROJECT MULIA EVERYTHING
 echo ============================================
 echo.
 
-REM ---------- 1. MySQL Server ----------
-netstat -ano | findstr ":3306" | findstr "LISTENING" >nul 2>&1
+REM ---------- 1. MySQL Server (instance khusus Mulia, port 3307) ----------
+REM CATATAN: port 3306 dipakai instance MySQL lain (project lain) - jangan disentuh
+netstat -ano | findstr ":3307" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 (
-    echo [1/3] Menyalakan MySQL Server...
-    start "MySQL Server" /min "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --defaults-file=D:/mysql-conf/my.ini --console
+    echo [1/3] Menyalakan MySQL Server Mulia (port 3307)...
+    start "MySQL Mulia (3307)" /min "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --defaults-file=D:/mysql-conf-mulia/my.ini --console
     echo       Menunggu MySQL siap...
     timeout /t 10 /nobreak >nul
 ) else (
-    echo [1/3] MySQL sudah berjalan.
+    echo [1/3] MySQL Mulia sudah berjalan.
 )
 
 REM ---------- 2. Backend API ----------

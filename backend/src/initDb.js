@@ -22,8 +22,8 @@ async function main() {
   if (!ada) {
     const hash = await bcrypt.hash('admin123', 10);
     await pool.query(
-      `INSERT INTO users (id, nama, email, password_hash, role, status, position, phone)
-       VALUES ('u-1', 'Super Admin', 'admin@mulia.com', ?, 'Developer', 'active', 'Pemilik Sistem', '08123456789')`,
+      `INSERT INTO users (id, nama, email, username, password_hash, role, status, position, phone)
+       VALUES ('u-1', 'Super Admin', 'admin@mulia.com', 'superadmin', ?, 'Developer', 'active', 'Pemilik Sistem', '08123456789')`,
       [hash]
     );
     console.log('Super Admin dibuat: admin@mulia.com / admin123');

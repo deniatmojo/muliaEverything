@@ -23,6 +23,8 @@ import DashboardSO from './modules/so/DashboardSO';
 import DashboardHome from './modules/dashboard/Dashboard';
 import CreateSO from './modules/so/CreateSO';
 import DetailSO from './modules/so/DetailSO';
+import EditSO from './modules/so/EditSO';
+import UploadVersion from './modules/so/UploadVersion';
 
 // Import Modul QC Traceability
 import QCHome from './modules/qc/QCHome';
@@ -79,6 +81,8 @@ export default function App() {
             <Route path="/so" element={<DashboardSO />} />
             <Route path="/so/create" element={<CreateSO />} />
             <Route path="/so/detail/:id" element={<DetailSO />} />
+            <Route path="/so/:id/edit" element={<EditSO />} />
+            <Route path="/so/:id/upload" element={<UploadVersion />} />
           </Route>
 
         </Route>

@@ -5,6 +5,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
 import ChatBubble from '../components/ChatBubble';
+import SoApprovalBubble from '../components/SoApprovalBubble';
 
 export default function AdminLayout() {
   // State global untuk layout: Mengontrol Sidebar di layar Mobile (HP)
@@ -34,6 +35,9 @@ export default function AdminLayout() {
 
         {/* Chat pribadi antar pengguna (bubble pojok kanan bawah) */}
         <ChatBubble />
+
+        {/* SO Control Panel (bubble pojok kiri bawah, khusus Developer) */}
+        <SoApprovalBubble />
       </div>
     </div>
   );

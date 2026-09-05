@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { callApi } from '../../services/api';
 import {
   Plus,
   Search,
@@ -238,6 +239,31 @@ const DashboardSO = () => {
   const [search, setSearch] = useState('');
   const [chartMetric, setChartMetric] = useState('count');
   const [chartRange, setChartRange] = useState('6m');
+  const [sos, setSos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    callApi('SO_LIST').then((res) => {
+      if (res.status === 'success') {
+        setSos((res.data || []).map((s) => ({
+          id: s.id,
+          customer: s.customer || '-',
+          project: s.project_name || '-',
+          item: s.project_number ? `Project ${s.project_number}` : '-',
+          status: s.stage === 'completed' ? 'Completed' : s.stage === 'pengiriman' ? 'Shipping' : s.stage === 'instalasi' ? 'Installing' : 'Production',
+          stage: s.stage || 'produksi',
+          progress: s.progress || 0,
+          deliveryDate: s.active_version ? `V.${s.active_version}` : '-',
+          createdAt: new Date(s.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }),
+          totalItems: s.material_count || 0,
+          shipped: 0,
+          value: Math.round((s.budget_idr || 0) / 1e6),
+          hasPending: !!s.has_pending_change,
+        })));
+      }
+      setLoading(false);
+    });
+  }, []);
 
   const chartData = useMemo(() => {
     const range = TREND_RANGES.find((r) => r.key === chartRange) || TREND_RANGES[1];
@@ -262,23 +288,23 @@ const DashboardSO = () => {
 
   const filteredSOs = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return mockSOs;
-    return mockSOs.filter(
+    if (!q) return sos;
+    return sos.filter(
       (so) =>
         so.id.toLowerCase().includes(q) ||
         so.customer.toLowerCase().includes(q) ||
         so.project.toLowerCase().includes(q) ||
         so.item.toLowerCase().includes(q)
     );
-  }, [search]);
+  }, [search, sos]);
 
   // Kalkulasi Metrik
-  const totalSO = mockSOs.length;
-  const pendingProduksi = 1; 
-  const inProduction = mockSOs.filter((s) => s.stage === 'produksi').length;
-  const inDelivery = mockSOs.filter((s) => s.stage === 'pengiriman').length;
-  const inInstallation = mockSOs.filter((s) => s.stage === 'instalasi').length;
-  const completed = mockSOs.filter((s) => s.status === 'Completed').length;
+  const totalSO = sos.length;
+  const pendingProduksi = sos.filter((s) => s.stage === 'produksi' && s.progress === 0).length;
+  const inProduction = sos.filter((s) => s.stage === 'produksi').length;
+  const inDelivery = sos.filter((s) => s.stage === 'pengiriman').length;
+  const inInstallation = sos.filter((s) => s.stage === 'instalasi').length;
+  const completed = sos.filter((s) => s.stage === 'completed').length;
 
   const summaryCards = [
     {

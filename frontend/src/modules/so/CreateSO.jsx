@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { callApi } from '../../services/api';
 import * as XLSX from 'xlsx';
 import {
   ArrowLeft,
@@ -203,7 +204,7 @@ const FormField = ({ field, value, onChange, isMatched }) => {
 // ---------------------------------------------------------------------------
 // Excel Upload & Extraction Card
 // ---------------------------------------------------------------------------
-const ExcelUploadCard = ({ onParsed }) => {
+const ExcelUploadCard = ({ onParsed, onFile, kurs = 0 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isUploaded, setIsUploaded] = useState(false);
@@ -224,6 +225,7 @@ const ExcelUploadCard = ({ onParsed }) => {
 
     setFileName(file.name);
     setIsUploading(true);
+    if (onFile) onFile(file); // simpan file mentah untuk dikirim ke server saat simpan
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -328,7 +330,7 @@ const ExcelUploadCard = ({ onParsed }) => {
         setTimeout(() => {
           setMaterialsImport(Object.values(tempImport));
           setMaterialsLocal(Object.values(tempLocal));
-          setTotals({ weight: gWeight, priceImportRMB: gPriceImport, priceLocalIDR: gPriceLocal, pallet: gPallet, budgetIDR: gBudget });
+          setTotals({ weight: gWeight, priceImportRMB: gPriceImport, priceLocalIDR: gPriceLocal, pallet: gPallet, budgetIDR: Math.round(gPriceLocal + gPriceImport * kurs) });
           setIsUploading(false);
           setIsUploaded(true);
           
@@ -337,9 +339,9 @@ const ExcelUploadCard = ({ onParsed }) => {
           const matchedFields = [];
           if (custName) { parsedUpdates.customerName = custName; matchedFields.push('customerName'); }
           if (projNum) { parsedUpdates.projectNumber = projNum; matchedFields.push('projectNumber'); }
-          if (gPallet) { parsedUpdates.palletCount = `${gPallet} Pallet`; matchedFields.push('palletCount'); }
-          // Gunakan Grand Total Budget (jika 0, fallback ke akumulasi harga lokal)
-          const finalBudget = gBudget || gPriceLocal; 
+          if (gPallet) { parsedUpdates.palletCount = String(gPallet); matchedFields.push('palletCount'); }
+          // Budget = material lokal (IDR) + material import (RMB x kurs API saat ini)
+          const finalBudget = Math.round(gPriceLocal + gPriceImport * kurs);
           if (finalBudget) { parsedUpdates.budget = finalBudget; matchedFields.push('budget'); }
 
           onParsed(parsedUpdates, matchedFields);
@@ -352,9 +354,10 @@ const ExcelUploadCard = ({ onParsed }) => {
       }
     };
     reader.readAsBinaryString(file);
-  }, [onParsed]);
+  }, [onParsed, kurs]);
 
   const clearFile = () => {
+    if (onFile) onFile(null);
     setFileName('');
     setMaterialsImport([]);
     setMaterialsLocal([]);
@@ -548,6 +551,15 @@ const CreateSO = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState(INITIAL_FORM);
   const [matchedKeys, setMatchedKeys] = useState(new Set());
+  const [excelFile, setExcelFile] = useState(null); // File mentah untuk dikirim ke server
+  const [saving, setSaving] = useState(false);
+  const [kurs, setKurs] = useState(0); // kurs RMB→IDR dari API (untuk hitung budget live)
+
+  useEffect(() => {
+    callApi('SO_GET_KURS').then((res) => {
+      if (res.status === 'success') setKurs(res.data.kurs || 0);
+    });
+  }, []);
 
   const handleChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -568,9 +580,32 @@ const CreateSO = () => {
     });
   };
 
-  const handleSave = () => {
-    console.log('Menyimpan project baru:', form);
-    navigate(`/so/detail/${form.soNumber || 'SO-BARU'}`);
+  const handleSave = async () => {
+    if (!form.soNumber || !form.soNumber.trim()) { alert('Nomor SO wajib diisi.'); return; }
+    setSaving(true);
+    let excel = null;
+    if (excelFile) {
+      const base64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(excelFile);
+      });
+      excel = { base64Data: base64, fileName: excelFile.name };
+    }
+    const res = await callApi('SO_CREATE', {
+      form: {
+        soNumber: form.soNumber, projectNumber: form.projectNumber, customerName: form.customerName,
+        projectName: form.projectName, companyName: form.companyName, salesName: form.salesName,
+        address: form.address, startProduction: form.startProduction, firstDelivery: form.firstDelivery,
+        startInstallation: form.startInstallation, targetInstallation: form.targetInstallation,
+        description: form.description,
+      },
+      excel,
+    });
+    setSaving(false);
+    if (res.status !== 'success') { alert(res.message); return; }
+    navigate(`/so/detail/${res.data.id}`);
   };
 
   return (
@@ -596,13 +631,13 @@ const CreateSO = () => {
               onClick={handleSave}
               className={`flex items-center justify-center gap-2 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-sm transition-all duration-200 active:scale-[0.98] shrink-0 ${ACCENTS.navy.solid}`}
             >
-              <Save size={16} /> Simpan Project
+              {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {saving ? 'Menyimpan...' : 'Simpan Project'}
             </button>
           </div>
         </Panel>
 
         {/* Excel import & Extract Area */}
-        <ExcelUploadCard onParsed={handleParsed} />
+        <ExcelUploadCard onParsed={handleParsed} onFile={setExcelFile} kurs={kurs} />
 
         {/* Form groups (Auto filled) */}
         {FIELD_GROUPS.map((group) => (
