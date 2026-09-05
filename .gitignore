@@ -17,3 +17,6 @@ frontend/dist/
 
 # Artefak tool
 graphify-out/
+
+# Prompt internal (berisi kredensial - jangan di-push)
+prompts/
