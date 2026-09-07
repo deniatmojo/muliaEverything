@@ -25,6 +25,7 @@ import CreateSO from './modules/so/CreateSO';
 import DetailSO from './modules/so/DetailSO';
 import EditSO from './modules/so/EditSO';
 import UploadVersion from './modules/so/UploadVersion';
+import ViewChangeRequest from './modules/so/ViewChangeRequest';
 
 // Import Modul QC Traceability
 import QCHome from './modules/qc/QCHome';
@@ -83,6 +84,7 @@ export default function App() {
             <Route path="/so/detail/:id" element={<DetailSO />} />
             <Route path="/so/:id/edit" element={<EditSO />} />
             <Route path="/so/:id/upload" element={<UploadVersion />} />
+            <Route path="/so/changes/:id/view" element={<ViewChangeRequest />} />
           </Route>
 
         </Route>

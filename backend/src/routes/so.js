@@ -163,12 +163,24 @@ router.delete('/:soId', requireRole('Developer'), async (req, res) => {
 // CHANGE REQUESTS: UPLOAD EXCEL BARU, EDIT MANUAL, APPROVAL
 // ====================================================================
 
-async function notifyDevelopers({ actorId, title, message, link }) {
-  const [devs] = await pool.query("SELECT id FROM users WHERE role = 'Developer' AND status = 'active'");
-  for (const d of devs) {
-    await createNotification({ userId: d.id, actorId, type: 'SO_APPROVAL', title, message, link });
+// Broadcast notifikasi ke semua user aktif yang boleh mengakses modul SO
+// (role dengan '/so' di akses_menu). Penerima = pelaku otomatis dilewati.
+async function notifySoUsers({ actorId, title, message, link, excludeIds = [] }) {
+  const [users] = await pool.query(
+    `SELECT u.id FROM users u
+     JOIN roles r ON r.nama_role = u.role
+     WHERE u.status = 'active' AND JSON_CONTAINS(r.akses_menu, JSON_QUOTE('/so'))`
+  );
+  for (const usr of users) {
+    if (excludeIds.includes(usr.id)) continue;
+    await createNotification({ userId: usr.id, actorId, type: 'SO_APPROVAL', title, message, link });
   }
 }
+const notifyDevelopers = notifySoUsers;
+
+// Nama untuk pesan notifikasi
+const requesterNama = (cr) => cr.requester_nama || cr.requester_name || 'pengguna';
+const approverNama = (req) => req.user?.nama || 'Developer';
 
 // util: ambil state aktif untuk perbandingan diff
 async function getActiveState(soId) {
@@ -268,6 +280,13 @@ router.post('/changes/:id/submit', async (req, res) => {
   await pool.query('UPDATE so_change_requests SET confirmed_at = NOW() WHERE id = ?', [cr.id]);
   await recordLog(req.user.id, 'SO_SUBMIT', `Mengirim perubahan SO ${cr.so_id} untuk approval`);
   const typeLabel = cr.type === 'excel' ? `mengupload BOQ baru` : `mengajukan edit manual`;
+  // tanda terima untuk pengaju (buka halaman read-only isi pengajuan)
+  await createNotification({
+    userId: req.user.id, actorId: req.user.id, type: 'SO_APPROVAL', allowSelf: true,
+    title: `Pengajuan perubahan SO ${cr.so_id} terkirim`,
+    message: 'Permintaan approval Anda telah dikirim dan sedang menunggu persetujuan Developer. Klik untuk melihat isi pengajuan.',
+    link: `/so/changes/${cr.id}/view`,
+  });
   await notifyDevelopers({
     actorId: req.user.id,
     title: `Perubahan SO ${cr.so_id} menunggu approval`,
@@ -312,6 +331,13 @@ router.post('/:soId/manual-submit', async (req, res) => {
   );
   await pool.query('UPDATE so SET has_pending_change = 1 WHERE id = ?', [soId]);
   await recordLog(req.user.id, 'SO_EDIT', `Mengajukan edit manual pada SO ${soId}`);
+  // tanda terima untuk pengaju (buka halaman read-only isi pengajuan)
+  await createNotification({
+    userId: req.user.id, actorId: req.user.id, type: 'SO_APPROVAL', allowSelf: true,
+    title: `Pengajuan perubahan SO ${soId} terkirim`,
+    message: 'Permintaan approval Anda telah dikirim dan sedang menunggu persetujuan Developer. Klik untuk melihat isi pengajuan.',
+    link: `/so/changes/${requestId}/view`,
+  });
   await notifyDevelopers({
     actorId: req.user.id,
     title: `Perubahan SO ${soId} menunggu approval`,
@@ -379,6 +405,7 @@ router.get('/changes/:id', async (req, res) => {
   return ok(res, 'Detail permintaan dimuat', {
     request: {
       id: cr.id, so_id: cr.so_id, type: cr.type, status: cr.status, submitted_at: cr.submitted_at,
+      reject_reason: cr.reject_reason ?? null, decided_at: cr.decided_at ?? null,
       requester: { nama: cr.requester_nama, username: cr.requester_username },
       draft_version_no: cr.draft_version_no, file_name: cr.file_name,
       kurs: cr.draft_kurs ?? null, kurs_date: cr.draft_kurs_date ?? null,
@@ -391,7 +418,7 @@ router.get('/changes/:id', async (req, res) => {
 
 // POST /api/so/changes/:id/approve — hanya Developer
 router.post('/changes/:id/approve', requireRole('Developer'), async (req, res) => {
-  const [[cr]] = await pool.query('SELECT * FROM so_change_requests WHERE id = ? AND status = ?', [req.params.id, 'pending']);
+  const [[cr]] = await pool.query(`SELECT cr.*, u.nama AS requester_nama FROM so_change_requests cr JOIN users u ON u.id = cr.requester_id WHERE cr.id = ? AND cr.status = ?`, [req.params.id, 'pending']);
   if (!cr) return fail(res, 'Permintaan tidak ditemukan / sudah diproses', 404);
 
   const conn = await pool.getConnection();
@@ -471,10 +498,17 @@ router.post('/changes/:id/approve', requireRole('Developer'), async (req, res) =
       conn.release();
       await recordLog(req.user.id, 'SO_APPROVE', `Menyetujui perubahan manual SO ${soIdFinal}`);
       await createNotification({
-        userId: cr.requester_id, actorId: req.user.id, type: 'SO_APPROVAL',
+        userId: cr.requester_id, actorId: req.user.id, type: 'SO_APPROVAL', allowSelf: true,
         title: `Perubahan SO ${soIdFinal} disetujui`,
         message: 'Perubahan yang Anda ajukan telah disetujui dan diterapkan.',
         link: `/so/detail/${soIdFinal}`,
+      });
+      await notifySoUsers({
+        actorId: req.user.id,
+        title: `SO ${soIdFinal} telah diperbarui`,
+        message: `Perubahan pada SO ${soIdFinal} oleh ${requesterNama(cr)} telah disetujui ${approverNama(req)} dan diterapkan.`,
+        link: `/so/detail/${soIdFinal}`,
+        excludeIds: [req.user.id, cr.requester_id],
       });
       return ok(res, 'Perubahan disetujui & diterapkan');
     }
@@ -492,10 +526,17 @@ router.post('/changes/:id/approve', requireRole('Developer'), async (req, res) =
   conn.release();
   await recordLog(req.user.id, 'SO_APPROVE', `Menyetujui upload BOQ baru SO ${cr.so_id}`);
   await createNotification({
-    userId: cr.requester_id, actorId: req.user.id, type: 'SO_APPROVAL',
+    userId: cr.requester_id, actorId: req.user.id, type: 'SO_APPROVAL', allowSelf: true,
     title: `Perubahan SO ${cr.so_id} disetujui`,
     message: 'Upload BOQ versi baru Anda telah disetujui dan diterapkan.',
     link: `/so/detail/${cr.so_id}`,
+  });
+  await notifySoUsers({
+    actorId: req.user.id,
+    title: `SO ${cr.so_id} telah diperbarui`,
+    message: `Upload BOQ baru pada SO ${cr.so_id} oleh ${requesterNama(cr)} telah disetujui ${approverNama(req)} dan diterapkan.`,
+    link: `/so/detail/${cr.so_id}`,
+    excludeIds: [req.user.id, cr.requester_id],
   });
   return ok(res, 'Perubahan disetujui & diterapkan');
 });
@@ -504,7 +545,7 @@ router.post('/changes/:id/approve', requireRole('Developer'), async (req, res) =
 router.post('/changes/:id/reject', requireRole('Developer'), async (req, res) => {
   const { reason } = req.body || {};
   if (!reason || !reason.trim()) return fail(res, 'Alasan penolakan wajib diisi.', 422);
-  const [[cr]] = await pool.query('SELECT * FROM so_change_requests WHERE id = ? AND status = ?', [req.params.id, 'pending']);
+  const [[cr]] = await pool.query(`SELECT cr.*, u.nama AS requester_nama FROM so_change_requests cr JOIN users u ON u.id = cr.requester_id WHERE cr.id = ? AND cr.status = ?`, [req.params.id, 'pending']);
   if (!cr) return fail(res, 'Permintaan tidak ditemukan / sudah diproses', 404);
 
   const conn = await pool.getConnection();
@@ -527,17 +568,24 @@ router.post('/changes/:id/reject', requireRole('Developer'), async (req, res) =>
   conn.release();
   await recordLog(req.user.id, 'SO_REJECT', `Menolak perubahan SO ${cr.so_id}: ${reason.trim()}`);
   await createNotification({
-    userId: cr.requester_id, actorId: req.user.id, type: 'SO_APPROVAL',
+    userId: cr.requester_id, actorId: req.user.id, type: 'SO_APPROVAL', allowSelf: true,
     title: `Perubahan SO ${cr.so_id} ditolak`,
     message: `Ditolak: ${reason.trim()}`,
     link: `/so/detail/${cr.so_id}`,
+  });
+  await notifySoUsers({
+    actorId: req.user.id,
+    title: `Perubahan SO ${cr.so_id} ditolak`,
+    message: `Perubahan pada SO ${cr.so_id} oleh ${requesterNama(cr)} ditolak ${approverNama(req)}. Data aktif tidak berubah.`,
+    link: `/so/detail/${cr.so_id}`,
+    excludeIds: [req.user.id, cr.requester_id],
   });
   return ok(res, 'Perubahan ditolak & pengaju diberi tahu');
 });
 
 // POST /api/so/changes/:id/discard — pengaju (atau Developer) membuang draftnya sendiri
 router.post('/changes/:id/discard', async (req, res) => {
-  const [[cr]] = await pool.query('SELECT * FROM so_change_requests WHERE id = ? AND status = ?', [req.params.id, 'pending']);
+  const [[cr]] = await pool.query(`SELECT cr.*, u.nama AS requester_nama FROM so_change_requests cr JOIN users u ON u.id = cr.requester_id WHERE cr.id = ? AND cr.status = ?`, [req.params.id, 'pending']);
   if (!cr) return fail(res, 'Permintaan tidak ditemukan / sudah diproses', 404);
   if (cr.requester_id !== req.user.id && req.user.role !== 'Developer') {
     return fail(res, 'Hanya pengaju atau Developer yang bisa membuang draft ini.', 403);

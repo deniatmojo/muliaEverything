@@ -281,7 +281,9 @@ export default function EditSO() {
     );
   };
 
-  const ModalEditor = () => modal && (
+  // Modal editor dirender sebagai fungsi (bukan komponen <ModalEditor />) supaya
+  // React tidak me-remount seluruh modal di setiap ketikan (kursor hilang).
+  const renderModalEditor = () => modal && (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setModal(null)}>
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg w-full max-w-lg border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
@@ -496,7 +498,7 @@ export default function EditSO() {
         </div>
       )}
 
-      <ModalEditor />
+      {renderModalEditor()}
 
       {/* DRAWER */}
       {drawerOpen && (

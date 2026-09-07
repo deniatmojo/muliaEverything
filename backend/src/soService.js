@@ -259,12 +259,14 @@ export async function insertVersionRows(conn, versionId, soId, materials, frames
 
 // Normalisasi baris DB (snake_case) ke bentuk internal (camelCase)
 export const normalizeMaterial = (r) => ({
+  id: r.id,
   sheet: r.sheet, articleCode: r.article_code ?? r.articleCode, description: r.description ?? null,
   dim1: r.dim1 ?? null, dim2: r.dim2 ?? null, colour: r.colour ?? null, ral: r.ral ?? null,
   qty: Number(r.qty ?? 0), unitWeight: Number(r.unit_weight ?? r.unitWeight ?? 0),
   unitPrice: Number(r.unit_price ?? r.unitPrice ?? 0), currency: r.currency ?? 'RMB', notes: r.notes ?? null,
 });
 export const normalizeFrame = (r) => ({
+  id: r.id,
   articleCode: r.article_code ?? r.articleCode, dim1: r.dim1 ?? null, dim2: r.dim2 ?? null,
   qty: Number(r.qty ?? 0), description: r.description ?? null,
 });

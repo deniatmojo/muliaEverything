@@ -25,9 +25,9 @@ export async function recordLog(userId, actionType, description, status = 'Sukse
  * Buat notifikasi lonceng untuk seorang user.
  * type: ACTIVITY | SO_NOTE | SO_CHAT | MENTION | CHAT (CHAT tidak dipakai - chat pribadi pakai badge bubble)
  */
-export async function createNotification({ userId, actorId = null, type, title, message = null, link = null }) {
-  // jangan buat notifikasi untuk diri sendiri
-  if (userId === actorId) return;
+export async function createNotification({ userId, actorId = null, type, title, message = null, link = null, allowSelf = false }) {
+  // jangan buat notifikasi untuk diri sendiri (kecuali tanda terima eksplisit, mis. hasil approval)
+  if (userId === actorId && !allowSelf) return;
   await pool.query(
     'INSERT INTO notifications (user_id, actor_id, type, title, message, link) VALUES (?, ?, ?, ?, ?, ?)',
     [userId, actorId, type, title, message, link]
