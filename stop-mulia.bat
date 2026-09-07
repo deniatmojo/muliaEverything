@@ -1,6 +1,6 @@
 @echo off
 title Mulia Everything - Stopper
-echo Menghentikan Backend & Frontend...
+echo Menghentikan Backend dan Frontend...
 
 REM Hentikan proses node yang mendengarkan port 3001 dan 5173
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001 :5173" ^| findstr "LISTENING"') do (

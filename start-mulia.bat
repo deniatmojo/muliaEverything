@@ -9,10 +9,10 @@ REM ---------- 1. MySQL Server (instance khusus Mulia, port 3307) ----------
 REM CATATAN: port 3306 dipakai instance MySQL lain (project lain) - jangan disentuh
 netstat -ano | findstr ":3307" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 (
-    echo [1/3] Menyalakan MySQL Server Mulia (port 3307)...
+    echo [1/3] Menyalakan MySQL Server Mulia ^(port 3307^)...
     start "MySQL Mulia (3307)" /min "C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --defaults-file=D:/mysql-conf-mulia/my.ini --console
     echo       Menunggu MySQL siap...
-    timeout /t 10 /nobreak >nul
+    timeout /t 12 /nobreak >nul
 ) else (
     echo [1/3] MySQL Mulia sudah berjalan.
 )
@@ -22,7 +22,7 @@ netstat -ano | findstr ":3001" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 (
     echo [2/3] Menyalakan Backend API...
     start "Backend API (port 3001)" /D "D:\Aira Dynamics Zone\mulia.airadynamics\backend" cmd /k npm run dev
-    timeout /t 5 /nobreak >nul
+    timeout /t 10 /nobreak >nul
 ) else (
     echo [2/3] Backend sudah berjalan.
 )
@@ -32,7 +32,7 @@ netstat -ano | findstr ":5173" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 (
     echo [3/3] Menyalakan Frontend...
     start "Frontend (port 5173)" /D "D:\Aira Dynamics Zone\mulia.airadynamics\frontend" cmd /k npm run dev
-    timeout /t 5 /nobreak >nul
+    timeout /t 6 /nobreak >nul
 ) else (
     echo [3/3] Frontend sudah berjalan.
 )
@@ -45,6 +45,6 @@ echo   (API backend: http://localhost:3001)
 echo ============================================
 echo.
 echo Jendela ini bisa ditutup. Server tetap jalan
-echo di jendela "MySQL Server", "Backend API",
+echo di jendela "MySQL Mulia (3307)", "Backend API",
 echo dan "Frontend" yang baru terbuka.
 pause

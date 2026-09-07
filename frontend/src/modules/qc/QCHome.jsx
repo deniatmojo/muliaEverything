@@ -3,7 +3,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { callApi } from '../../services/api';
 import {
   Search, Filter, Plus, Pen, Printer, X, QrCode, LayoutGrid,
-  Boxes, Layers, Package, PieChart, Users, Loader2, Lock, Download,
+  Boxes, Layers, Package, PieChart, Users, Loader2, Lock, Download, Copy,
   CircleCheck, UserCheck, UserX, PackageOpen, Mail, AtSign, Phone,
 } from 'lucide-react';
 
@@ -179,6 +179,7 @@ export default function QCHome() {
   // Form modal
   const [formOpen, setFormOpen] = useState(false);
   const [editItem, setEditItem] = useState(null); // null = buat baru
+  const [dupFrom, setDupFrom] = useState(null);   // kode item sumber duplikat (null = bukan duplikat)
   const [formType, setFormType] = useState('bundle');
   const [formValues, setFormValues] = useState({});
   const [formPin, setFormPin] = useState('');
@@ -234,6 +235,7 @@ export default function QCHome() {
   const openCreate = (type) => {
     if (type === 'packaging') return showNotice('Tipe Packaging Upright akan tersedia segera.', 'error');
     setEditItem(null);
+    setDupFrom(null);
     setFormType(type);
     setFormValues({ status_item: type === 'bundle' ? 'InChecking' : 'In Checking', qc_process: 'Unchecking', shift: '1' });
     setFormPin('');
@@ -242,8 +244,26 @@ export default function QCHome() {
 
   const openEdit = (item) => {
     setEditItem(item);
+    setDupFrom(null);
     setFormType(item.type);
     setFormValues({ ...(item.data || {}), status_item: normalizeFgStatus(item.type, item.status_item), qc_process: item.qc_process, inspector: item.inspector || '', note: item.note || '' });
+    setFormPin('');
+    setFormOpen(true);
+  };
+
+  // Duplikat: form "buat baru" terisi penuh data item sumber; cukup ubah selisihnya (no coil/seri/dll) lalu Generate.
+  // PIN, status, inspector & catatan direset karena item fisiknya belum dicek; PIN lama tak bisa disalin (ter-hash).
+  const openDuplicate = (item) => {
+    setEditItem(null);
+    setDupFrom(item.code);
+    setFormType(item.type);
+    setFormValues({
+      ...(item.data || {}),
+      status_item: item.type === 'bundle' ? 'InChecking' : 'In Checking',
+      qc_process: 'Unchecking',
+      inspector: '',
+      note: '',
+    });
     setFormPin('');
     setFormOpen(true);
   };
@@ -491,6 +511,7 @@ export default function QCHome() {
                   </div>
                   <div className="flex justify-start md:justify-end gap-1">
                     <button onClick={() => openEdit(item)} className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded border border-transparent hover:border-blue-200 dark:hover:border-blue-800" title="Edit Data"><Pen size={14} /></button>
+                    <button onClick={() => openDuplicate(item)} className="p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Duplikat (buat baru dari data ini)"><Copy size={14} /></button>
                     <button onClick={() => setPreviewItem(item)} className="p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" title="Print"><Printer size={14} /></button>
                   </div>
                 </div>
@@ -584,7 +605,9 @@ export default function QCHome() {
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center"><QrCode size={16} className="text-gray-600 dark:text-gray-300" /></div>
                 <div>
-                  <div className="font-bold text-sm text-gray-800 dark:text-white">{editItem ? `Edit: ${editItem.code}` : 'Barcode baru'}</div>
+                  <div className="font-bold text-sm text-gray-800 dark:text-white">
+                    {editItem ? `Edit: ${editItem.code}` : dupFrom ? `Barcode baru (duplikat ${dupFrom})` : 'Barcode baru'}
+                  </div>
                   <div className="text-[11.5px] text-gray-500 dark:text-gray-400 font-medium">{TYPE_META[formType].longLabel}</div>
                 </div>
               </div>
