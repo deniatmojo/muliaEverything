@@ -7,9 +7,9 @@ import {
   ShieldCheck,
   Briefcase, // 1. Import ikon Briefcase untuk modul SO
   QrCode, // Ikon untuk modul QC Traceability
-  Wrench // Ikon untuk modul Maintenance
-} from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+  Wrench, // Ikon untuk modul Maintenance
+  Factory // Ikon untuk modul Production
+} from 'lucide-react';import { Link, useLocation } from 'react-router-dom';
 
 export default function Sidebar({ isOpen, setIsOpen }) {
   const location = useLocation();
@@ -30,6 +30,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     { title: 'Project / SO', path: '/so', icon: Briefcase }, // 2. Tambahkan menu SO di sini tanpa tag < />
     { title: 'QC Traceability', path: '/qc', icon: QrCode },
     { title: 'Maintenance', path: '/maintenance', icon: Wrench },
+    { title: 'Production', path: '/production', icon: Factory },
     { title: 'Developer', path: '/developer', icon: ShieldCheck },
   ];
 

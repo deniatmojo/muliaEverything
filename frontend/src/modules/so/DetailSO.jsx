@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { callApi } from '../../services/api';
+import { isProductionMaterial, MACHINES, jobsPct } from '../production/productionData';
 import {
   ArrowLeft,
   Pencil,
@@ -206,7 +207,8 @@ const InfoField = ({ icon: Icon, label, value, mono = false, className = '' }) =
 const fmtDateID = (d) => (d ? new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-');
 const fmtIDRShort = (n) => (n ? 'Rp ' + new Intl.NumberFormat('id-ID').format(n) : '-');
 
-const HeroBlock = ({ id, so, onNavigateBack, onJump, refs, onEdit, onUpload }) => (
+
+const HeroBlock = ({ id, so, onNavigateBack, onJump, refs, onEdit, onUpload, onProduction, produksiPct = 0 }) => (
   <Panel className="!p-0 overflow-hidden h-full">
     <div className="px-6 sm:px-7 pt-5 pb-6">
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -244,6 +246,12 @@ const HeroBlock = ({ id, so, onNavigateBack, onJump, refs, onEdit, onUpload }) =
             title={so?.has_pending_change ? 'Menunggu approval perubahan lain' : 'Upload BOQ versi baru'}
             className={`flex items-center gap-1.5 text-white px-3.5 py-2 rounded-xl font-medium text-sm shadow-sm transition-all duration-200 active:scale-[0.98] ${so?.has_pending_change ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed' : ACCENTS.blue.solid || ACCENTS.navy.solid}`}>
             <Upload size={13} /> Upload
+          </button>
+          <button
+            onClick={onProduction}
+            title="Buka modul Production untuk project ini"
+            className={`flex items-center gap-1.5 text-white px-3.5 py-2 rounded-xl font-medium text-sm shadow-sm transition-all duration-200 active:scale-[0.98] ${ACCENTS.teal.solid}`}>
+            <Factory size={13} /> Atur Produksi
           </button>
         </div>
       </div>
@@ -283,7 +291,7 @@ const HeroBlock = ({ id, so, onNavigateBack, onJump, refs, onEdit, onUpload }) =
         Progress Keseluruhan <span className="normal-case text-gray-300 dark:text-gray-600">· klik untuk lompat ke detail</span>
       </h3>
       <div className="flex items-center justify-around sm:justify-start sm:gap-10">
-        <RingProgress percent={75} accent={ACCENTS.navy} label="Produksi" icon={Factory} onClick={() => onJump(refs.produksi)} />
+        <RingProgress percent={produksiPct} accent={ACCENTS.navy} label="Produksi" icon={Factory} onClick={() => onJump(refs.produksi)} />
         <RingProgress percent={25} accent={ACCENTS.blue} label="Pengiriman" icon={Truck} onClick={() => onJump(refs.pengiriman)} />
         <RingProgress percent={65} accent={ACCENTS.teal} label="Instalasi" icon={Wrench} onClick={() => onJump(refs.instalasi)} />
       </div>
@@ -292,49 +300,105 @@ const HeroBlock = ({ id, so, onNavigateBack, onJump, refs, onEdit, onUpload }) =
 );
 
 // ---------------------------------------------------------------------------
-// Block 2 — Proses Produksi
+// Block 2 — Proses Produksi (data asli dari modul Production: production_jobs)
 // ---------------------------------------------------------------------------
-const productionRows = [
-  { code: 'MPU 22', dim: '10000', colour: 'S+ Blue', manufacture: 100, painting: 90, done: 95 },
-  { code: 'MPD 2015', dim: '1068', colour: 'Galva', manufacture: 60, painting: 40, done: 50 },
-  { code: 'MPD 2015', dim: '1022', colour: 'Galva', manufacture: 30, painting: 10, done: 20 },
-  { code: 'MPD 2015', dim: '1050', colour: 'Galva', manufacture: 85, painting: 70, done: 78 },
-];
+const ProductionBlock = ({ innerRef, soId, materials, jobs, onOpen }) => {
+  // Progres per material = rata-rata job produksinya (roll/welding/painting)
+  const jobsOf = (m) => jobs.filter((j) => j.articleCode === m.articleCode
+    && (j.dim1 ?? '') === (m.dim1 ?? '') && (j.colour ?? '') === (m.colour ?? ''));
+  const progressOf = (m) => jobsPct(jobsOf(m));
+  const overall = jobsPct(jobs);
+  const perMachine = MACHINES.map((mc) => {
+    const items = jobs.filter((j) => j.machine === mc.key);
+    const done = items.reduce((a, j) => a + Math.min(j.qtyDone, j.qtyTarget), 0);
+    const target = items.reduce((a, j) => a + j.qtyTarget, 0);
+    return { name: mc.short, pct: target ? Math.round((done / target) * 100) : 0, done, target };
+  }).filter((p) => p.target > 0);
+  const fmtPcs = (n) => new Intl.NumberFormat('id-ID').format(n);
 
-const ProductionBlock = ({ innerRef }) => (
-  <Panel innerRef={innerRef} className="h-full">
-    <SectionHeading
-      icon={Factory} accent={ACCENTS.navy} eyebrow="Manufaktur" title="Proses Produksi"
-      action={<button className={`flex items-center gap-1.5 text-xs font-semibold text-white px-3.5 py-2 rounded-lg transition-colors shrink-0 ${ACCENTS.navy.solid}`}><Cog size={13} /> Atur Produksi</button>}
-    />
-    <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
-      <table className="w-full text-left border-collapse min-w-[640px]">
-        <thead>
-          <tr className="bg-gray-50 dark:bg-gray-700/40 text-[11px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            <th className="p-3.5 font-semibold">Article Code</th>
-            <th className="p-3.5 font-semibold">Dim 1</th>
-            <th className="p-3.5 font-semibold">Colour</th>
-            <th className="p-3.5 font-semibold">Progress Manufacture</th>
-            <th className="p-3.5 font-semibold">Progress Painting</th>
-            <th className="p-3.5 font-semibold">Persen Selesai</th>
-          </tr>
-        </thead>
-        <tbody>
-          {productionRows.map((row, i) => (
-            <tr key={i} className="border-t border-gray-100 dark:border-gray-700/60 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-              <td className="p-3.5 font-semibold text-gray-800 dark:text-gray-100 font-mono text-[13px]">{row.code}</td>
-              <td className="p-3.5 text-gray-600 dark:text-gray-300 tabular-nums">{row.dim}</td>
-              <td className="p-3.5"><span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><Paintbrush size={12} className="text-gray-400" /> {row.colour}</span></td>
-              <td className="p-3.5"><MiniBar percent={row.manufacture} accent={ACCENTS.navy} /></td>
-              <td className="p-3.5"><MiniBar percent={row.painting} accent={ACCENTS.blue} /></td>
-              <td className="p-3.5"><span className={`text-xs font-bold px-2 py-1 rounded-md ${DONE_STYLES(row.done)}`}>{row.done}%</span></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </Panel>
-);
+  return (
+    <Panel innerRef={innerRef} className="h-full">
+      <SectionHeading
+        icon={Factory} accent={ACCENTS.navy} eyebrow="Manufaktur" title="Proses Produksi"
+        action={(
+          <button onClick={onOpen}
+            className={`flex items-center gap-1.5 text-xs font-semibold text-white px-3.5 py-2 rounded-lg transition-colors shrink-0 ${ACCENTS.navy.solid}`}>
+            <Cog size={13} /> Atur Produksi
+          </button>
+        )}
+      />
+
+      {materials.length === 0 ? (
+        <p className="text-sm text-gray-400 py-8 text-center">Belum ada material produksi (MPU/MPD/MPB lokal) pada SO ini.</p>
+      ) : (
+        <>
+          {/* Ringkasan progress per mesin */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5 mb-6">
+            <div className="sm:w-40 shrink-0 text-center sm:text-left">
+              <p className="text-3xl font-bold text-[#0F3B6C] dark:text-white tabular-nums">{overall}<span className="text-lg">%</span></p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Progress keseluruhan produksi</p>
+            </div>
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-2.5">
+              {perMachine.map((p) => (
+                <div key={p.name}>
+                  <div className="flex items-center justify-between text-[11px] mb-1">
+                    <span className="text-gray-600 dark:text-gray-300 font-medium">{p.name}</span>
+                    <span className="text-gray-400">{fmtPcs(p.done)}/{fmtPcs(p.target)} pcs · {p.pct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${p.pct}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tabel material produksi (data asli BOQ versi aktif) */}
+          <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
+            <table className="w-full text-left border-collapse min-w-[640px]">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-700/40 text-[11px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  <th className="p-3.5 font-semibold">Article Code</th>
+                  <th className="p-3.5 font-semibold">Dim 1</th>
+                  <th className="p-3.5 font-semibold">Colour</th>
+                  <th className="p-3.5 font-semibold">Mesin</th>
+                  <th className="p-3.5 font-semibold">Qty</th>
+                  <th className="p-3.5 font-semibold">Progress</th>
+                  <th className="p-3.5 font-semibold">Persen Selesai</th>
+                </tr>
+              </thead>
+              <tbody>
+                {materials.slice(0, 8).map((row, i) => {
+                  const rowJobs = jobsOf(row);
+                  const machineShorts = [...new Set(rowJobs.map((j) => MACHINES.find((m) => m.key === j.machine)?.short).filter(Boolean))];
+                  const galva = String(row.colour || '').toUpperCase() === 'GALVA';
+                  const prog = progressOf(row);
+                  return (
+                    <tr key={i} className="border-t border-gray-100 dark:border-gray-700/60 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                      <td className="p-3.5 font-semibold text-gray-800 dark:text-gray-100 font-mono text-[13px]">{row.articleCode}</td>
+                      <td className="p-3.5 text-gray-600 dark:text-gray-300 tabular-nums">{row.dim1 ?? '-'}</td>
+                      <td className="p-3.5"><span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300"><Paintbrush size={12} className="text-gray-400" /> {row.colour ?? '-'}</span></td>
+                      <td className="p-3.5 text-xs text-gray-500 dark:text-gray-400">{machineShorts.length ? machineShorts.join(' → ') : '-'}{galva ? ' · tanpa painting' : ''}</td>
+                      <td className="p-3.5 text-gray-600 dark:text-gray-300 tabular-nums">{fmtPcs(row.qty)}</td>
+                      <td className="p-3.5"><MiniBar percent={prog} accent={ACCENTS.navy} /></td>
+                      <td className="p-3.5"><span className={`text-xs font-bold px-2 py-1 rounded-md ${DONE_STYLES(prog)}`}>{prog}%</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {materials.length > 8 && (
+              <button onClick={onOpen} className="w-full py-2.5 text-xs font-semibold text-[#0084C9] dark:text-cyan-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 border-t border-gray-100 dark:border-gray-700 transition-colors">
+                + {materials.length - 8} material lainnya — buka modul Production
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-2">Sumber: Modul Production · {soId} · progres aktual dari pencatatan output operator (job produksi).</p>
+        </>
+      )}
+    </Panel>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Block 3 — Proses Pengiriman
@@ -629,11 +693,22 @@ const DetailSO = () => {
 
   // Data master SO (dari backend; bila SO belum ada di DB, tampil nilai default)
   const [soData, setSoData] = useState(null);
+  const [prodMaterials, setProdMaterials] = useState([]); // material produksi (lokal MPU/MPD/MPB)
+  const [prodJobs, setProdJobs] = useState([]); // job produksi nyata (production_jobs)
+  const [produksiPct, setProduksiPct] = useState(0);
   useEffect(() => {
     callApi('SO_DETAIL', { soId }).then((res) => {
       if (res.status === 'success') {
         const activeVer = (res.data.versions || []).find((v) => v.id === res.data.so.active_version_id);
         setSoData({ ...res.data.so, active_version_label: activeVer?.version_no ?? null });
+        setProdMaterials((res.data.materials || []).filter(isProductionMaterial));
+      }
+    });
+    // Job produksi dibuat otomatis dari material versi aktif saat halaman dibuka
+    callApi('PRODUCTION_JOBS', { soId }).then((res) => {
+      if (res.status === 'success') {
+        setProdJobs(res.data.jobs || []);
+        setProduksiPct(res.data.so?.progress ?? 0);
       }
     });
   }, [soId]);
@@ -710,8 +785,8 @@ const DetailSO = () => {
           {/* BARIS 1: SO (Hero Block) */}
           <div className="flex flex-col xl:flex-row gap-5 items-stretch">
             <div className="flex-1 min-w-0 flex flex-col">
-              <HeroBlock id={soId} so={soData} onNavigateBack={() => navigate('/so')} onJump={jumpTo} refs={{ produksi: produksiRef, pengiriman: pengirimanRef, instalasi: instalasiRef }}
-                onEdit={() => navigate(`/so/${soId}/edit`)} onUpload={() => navigate(`/so/${soId}/upload`)} />
+              <HeroBlock id={soId} so={soData} onNavigateBack={() => navigate('/so')} onJump={jumpTo} refs={{ produksi: produksiRef, pengiriman: pengirimanRef, instalasi: instalasiRef }} produksiPct={produksiPct}
+                onEdit={() => navigate(`/so/${soId}/edit`)} onUpload={() => navigate(`/so/${soId}/upload`)} onProduction={() => navigate(`/production/${soId}`)} />
             </div>
             <div className="w-full xl:w-[380px] shrink-0 flex flex-col">
               <NoteCard moduleKey="so" title="SO" icon={ClipboardList} accent={ACCENTS.navy} notes={notes.so} onSend={handleSendNote} directory={directory} />
@@ -721,7 +796,7 @@ const DetailSO = () => {
           {/* BARIS 2: Produksi */}
           <div className="flex flex-col xl:flex-row gap-5 items-stretch">
             <div className="flex-1 min-w-0 flex flex-col">
-              <ProductionBlock innerRef={produksiRef} />
+              <ProductionBlock innerRef={produksiRef} soId={soId} materials={prodMaterials} jobs={prodJobs} onOpen={() => navigate(`/production/${soId}`)} />
             </div>
             <div className="w-full xl:w-[380px] shrink-0 flex flex-col">
               <NoteCard moduleKey="produksi" title="Produksi" icon={Factory} accent={ACCENTS.navy} notes={notes.produksi} onSend={handleSendNote} directory={directory} />

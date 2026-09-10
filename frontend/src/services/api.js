@@ -56,6 +56,16 @@ const ROUTES = {
   // === Modul Maintenance ===
   GET_MAINTENANCE_TEAM:  { method: 'GET',  path: () => '/maintenance/team' },
 
+  // === Modul Production (job per mesin, output operator, QR lapangan) ===
+  PRODUCTION_OVERVIEW:   { method: 'GET',  path: () => '/production/overview' },
+  PRODUCTION_BUFFER:     { method: 'GET',  path: () => '/production/buffer-stock' },
+  PRODUCTION_JOBS:       { method: 'GET',  path: (d) => `/production/${encodeURIComponent(d.soId)}/jobs` },
+  PRODUCTION_OUTPUT:     { method: 'POST', path: (d) => `/production/jobs/${encodeURIComponent(d.jobId)}/output` },
+  PRODUCTION_QR_CREATE:  { method: 'POST', path: (d) => `/production/${encodeURIComponent(d.soId)}/qr` },
+  PRODUCTION_QR_REVOKE:  { method: 'POST', path: (d) => `/production/qr/${encodeURIComponent(d.id)}/revoke` },
+  PRODUCTION_SCAN_GET:   { method: 'GET',  path: (d) => `/production/public/${encodeURIComponent(d.token)}`, noAuth: true },
+  PRODUCTION_SCAN_OUTPUT:{ method: 'POST', path: (d) => `/production/public/${encodeURIComponent(d.token)}/output`, noAuth: true },
+
   // === Modul QC Traceability ===
   QC_LIST_ITEMS:        { method: 'GET',  path: (d) => `/qc/items?search=${encodeURIComponent(d.search || '')}&type=${encodeURIComponent(d.type || 'all')}` },
   QC_CREATE_ITEM:       { method: 'POST', path: () => '/qc/items' },

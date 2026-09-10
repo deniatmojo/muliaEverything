@@ -12,6 +12,9 @@ const num = (v) => {
   const n = parseFloat(v);
   return isNaN(n) ? 0 : n;
 };
+// pembulatan: dimensi ke bilangan bulat, berat & harga ke 2 desimal
+const roundInt = (v) => (isNaN(parseFloat(v)) ? v : String(Math.round(parseFloat(v))));
+const round2 = (v) => Math.round((parseFloat(v) || 0) * 100) / 100;
 const str = (v) => (v === null || v === undefined ? null : String(v).trim() || null);
 const isFrameCode = (code) => /^MPF(\s|$)/i.test(String(code || ''));
 
@@ -74,19 +77,19 @@ export function parseBoqWorkbook(buffer) {
       if (isNaN(qty) || !row[1]) continue;
 
       const articleCode = str(row[1]);
-      const dim1 = str(row[2]);
+      const dim1 = roundInt(row[2]);
       const dim2 = str(row[3]);
       const colour = str(row[7]);
       const ral = str(row[8]);
-      const unitWeight = num(row[9]);
-      const unitPrice = num(row[10]);
+      const unitWeight = round2(row[9]);
+      const unitPrice = round2(row[10]);
       const description = str(row[13]);
       const notes = str(row[14]);
 
       // MPF = frame assembly, bukan material
       if (isFrameCode(articleCode)) {
-        const key = `${articleCode}|${dim1}|${dim2}`;
-        if (!frmMap.has(key)) frmMap.set(key, { articleCode, dim1, dim2, qty: 0, description });
+        const key = `${articleCode}|${roundInt(row[2])}|${roundInt(row[3])}`;
+        if (!frmMap.has(key)) frmMap.set(key, { articleCode, dim1: roundInt(row[2]), dim2: roundInt(row[3]), qty: 0, description });
         frmMap.get(key).qty += qty;
         continue;
       }
@@ -163,9 +166,13 @@ export function computeTotals(materials) {
 }
 
 // ====================================================================
-// DIFF dua daftar material/frame (key: sheet|article|dim1|dim2|colour|currency)
+// DIFF dua daftar material/frame
+// Excel flow: key gabungan (sheet|article|dim|colour|currency).
+// Edit manual: key = id baris (stabil) agar edit article code / dim tetap
+// terdeteksi sebagai perubahan, bukan tambah+hapus.
 // ====================================================================
 const MAT_KEY = (m) => `${m.sheet ?? ''}|${m.articleCode ?? ''}|${m.dim1 ?? ''}|${m.dim2 ?? ''}|${m.colour ?? ''}|${m.currency ?? ''}`;
+const ID_KEY = (m) => `id:${m.id ?? ''}`;
 const FRM_KEY = (f) => `${f.articleCode ?? ''}|${f.dim1 ?? ''}|${f.dim2 ?? ''}`;
 
 const MAT_FIELDS = [
@@ -174,11 +181,17 @@ const MAT_FIELDS = [
   { key: 'unitPrice', label: 'Harga Unit' },
   { key: 'description', label: 'Description' },
   { key: 'ral', label: 'RAL' },
+  { key: 'dim1', label: 'Dim 1' },
+  { key: 'dim2', label: 'Dim 2' },
+  { key: 'colour', label: 'Colour' },
+  { key: 'sheet', label: 'Sheet' },
+  { key: 'articleCode', label: 'Article Code' },
 ];
 
-export function diffMaterials(oldList, newList) {
-  const oldMap = new Map(oldList.map((m) => [MAT_KEY(m), m]));
-  const newMap = new Map(newList.map((m) => [MAT_KEY(m), m]));
+export function diffMaterials(oldList, newList, { byId = false } = {}) {
+  const keyFn = byId ? ID_KEY : MAT_KEY;
+  const oldMap = new Map(oldList.map((m) => [keyFn(m), m]));
+  const newMap = new Map(newList.map((m) => [keyFn(m), m]));
   const result = { changed: [], added: [], removed: [], unchanged: 0 };
 
   for (const [key, nm] of newMap) {
@@ -261,9 +274,9 @@ export async function insertVersionRows(conn, versionId, soId, materials, frames
 export const normalizeMaterial = (r) => ({
   id: r.id,
   sheet: r.sheet, articleCode: r.article_code ?? r.articleCode, description: r.description ?? null,
-  dim1: r.dim1 ?? null, dim2: r.dim2 ?? null, colour: r.colour ?? null, ral: r.ral ?? null,
-  qty: Number(r.qty ?? 0), unitWeight: Number(r.unit_weight ?? r.unitWeight ?? 0),
-  unitPrice: Number(r.unit_price ?? r.unitPrice ?? 0), currency: r.currency ?? 'RMB', notes: r.notes ?? null,
+  dim1: r.dim1 != null ? roundInt(r.dim1) : null, dim2: r.dim2 ?? null, colour: r.colour ?? null, ral: r.ral ?? null,
+  qty: Number(r.qty ?? 0), unitWeight: round2(r.unit_weight ?? r.unitWeight ?? 0),
+  unitPrice: round2(r.unit_price ?? r.unitPrice ?? 0), currency: r.currency ?? 'RMB', notes: r.notes ?? null,
 });
 export const normalizeFrame = (r) => ({
   id: r.id,

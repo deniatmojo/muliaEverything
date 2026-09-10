@@ -15,6 +15,7 @@ const fmtRMB = (n) => '¥' + fmtNum(n, 2);
 const SHEETS = ['BOQ-Standard Items', 'BOQ-Non Standard Items', 'BOQ-Standard Frame Protector'];
 
 const MAT_FIELDS = [
+  { key: 'articleCode', label: 'Article Code' },
   { key: 'qty', label: 'QTY' },
   { key: 'hargaUnit', label: 'Harga Unit' },
   { key: 'beratUnit', label: 'Berat Unit' },
@@ -96,11 +97,15 @@ export default function EditSO() {
   }, [id, navigate]);
 
   // ---- diff helpers ----
+  // Pencocokan baris lama vs baru memakai id (stabil), BUKAN gabungan article/dim —
+  // agar edit Article Code / Dim 1 tetap terdeteksi sebagai perubahan baris yang sama.
   const matKey = (m) => `${m.sheet ?? ''}|${m.articleCode}|${m.dim1 ?? ''}|${m.dim2 ?? ''}|${m.colour ?? ''}|${m.currency}`;
+  const findOriginal = (m) =>
+    original?.materials.find((x) => (m.id != null && x.id === m.id) || (!m.id && !x.id && matKey(x) === matKey(m)));
   const matStatus = (m) => {
     if (m._new) return m._deleted ? null : 'new';
     if (m._deleted) return 'deleted';
-    const o = original?.materials.find((x) => matKey(x) === matKey(m));
+    const o = findOriginal(m);
     if (!o) return 'unchanged';
     return MAT_FIELDS.some((f) => String(m[f.key] ?? '') !== String(o[f.key === 'hargaUnit' ? 'unitPrice' : f.key === 'beratUnit' ? 'unitWeight' : f.key] ?? '')) ? 'changed' : 'unchanged';
   };
@@ -126,11 +131,14 @@ export default function EditSO() {
       if (st === 'new') out.push({ tone: 'new', text: `${m.articleCode} ditambahkan` });
       else if (st === 'deleted') out.push({ tone: 'deleted', text: `${m.articleCode} dihapus` });
       else {
-        const o = original.materials.find((x) => matKey(x) === matKey(m));
+        const o = findOriginal(m);
         MAT_FIELDS.forEach((f) => {
           const oKey = f.key === 'hargaUnit' ? 'unitPrice' : f.key === 'beratUnit' ? 'unitWeight' : f.key;
           if (String(m[f.key] ?? '') !== String(o[oKey] ?? '')) {
-            out.push({ tone: 'changed', text: `${f.label} ${m.articleCode}: ${String(o[oKey] ?? '')} → ${String(m[f.key] ?? '')}` });
+            const text = f.key === 'articleCode'
+              ? `Article Code: ${o.articleCode} → ${m.articleCode}`
+              : `${f.label} ${m.articleCode}: ${String(o[oKey] ?? '')} → ${String(m[f.key] ?? '')}`;
+            out.push({ tone: 'changed', text });
           }
         });
       }

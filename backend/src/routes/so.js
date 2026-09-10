@@ -307,7 +307,15 @@ router.post('/:soId/manual-submit', async (req, res) => {
   if (so.has_pending_change) return fail(res, 'SO ini masih memiliki permintaan perubahan yang menunggu approval.', 409);
 
   const active = await getActiveState(soId);
-  const totalsNew = computeTotals(materials);
+  // normalisasi payload edit manual (pembulatan dim1 → bulat, berat & harga → 2 desimal)
+  const payloadMaterials = materials.map((m) => ({
+    ...m,
+    dim1: m.dim1 != null && !isNaN(parseFloat(m.dim1)) ? String(Math.round(parseFloat(m.dim1))) : m.dim1 ?? null,
+    unitWeight: Math.round((Number(m.unitWeight ?? m.beratUnit) || 0) * 100) / 100,
+    unitPrice: Math.round((Number(m.unitPrice ?? m.hargaUnit) || 0) * 100) / 100,
+    qty: Number(m.qty) || 0,
+  }));
+  const totalsNew = computeTotals(payloadMaterials);
   const totalsOld = computeTotals(active.materials);
   const palletNew = form?.palletCount != null ? parseInt(form.palletCount) : so.pallet_count;
   const diff = {
@@ -317,7 +325,9 @@ router.post('/:soId/manual-submit', async (req, res) => {
       first_delivery: form.firstDelivery, start_installation: form.startInstallation,
       target_installation: form.targetInstallation, description: form.description,
     }),
-    materials: diffMaterials(active.materials, materials),
+    // byId: identitas baris = id (bukan gabungan article/dim), supaya edit Article Code /
+    // Dim 1 tercatat sebagai perubahan baris yang sama
+    materials: diffMaterials(active.materials, payloadMaterials, { byId: true }),
     frames: diffFrames(active.frames, Array.isArray(frames) ? frames : []),
   };
   const impact = buildImpact(so, totalsOld, totalsNew, palletNew, so.kurs);
@@ -326,7 +336,7 @@ router.post('/:soId/manual-submit', async (req, res) => {
   await pool.query(
     `INSERT INTO so_change_requests (id, so_id, type, status, payload, diff, impact, requester_id, confirmed_at)
      VALUES (?,?, 'manual', 'pending', ?, ?, ?, ?, NOW())`,
-    [requestId, soId, JSON.stringify({ form: form || {}, materials, frames: frames || [], __totals: totalsNew }),
+    [requestId, soId, JSON.stringify({ form: form || {}, materials: payloadMaterials, frames: frames || [], __totals: totalsNew }),
       JSON.stringify(diff), JSON.stringify(impact), req.user.id]
   );
   await pool.query('UPDATE so SET has_pending_change = 1 WHERE id = ?', [soId]);

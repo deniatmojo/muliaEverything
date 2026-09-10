@@ -11,6 +11,7 @@ import soRoutes from './routes/so.js';
 import chatRoutes from './routes/chat.js';
 import qcRoutes from './routes/qc.js';
 import maintenanceRoutes from './routes/maintenance.js';
+import productionRoutes from './routes/production.js';
 import { fail } from './utils.js';
 
 const app = express();
@@ -42,6 +43,7 @@ app.use('/api/so', soRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/qc', qcRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/production', productionRoutes);
 
 // 404 & error handler
 app.use((req, res) => fail(res, 'Action tidak ditemukan', 404));
