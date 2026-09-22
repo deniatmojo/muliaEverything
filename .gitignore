@@ -20,3 +20,4 @@ graphify-out/
 
 # Prompt internal (berisi kredensial - jangan di-push)
 prompts/
+graphify-watch-mulia.bat
