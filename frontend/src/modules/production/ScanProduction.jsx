@@ -66,7 +66,7 @@ export default function ScanProduction() {
           </div>
           <div className="min-w-0">
             <h1 className="font-bold text-aira-navy dark:text-white leading-tight">Update Progress Produksi</h1>
-            <p className="text-xs text-gray-400">Mulia Everything · halaman lapangan tanpa login</p>
+            <p className="text-xs text-gray-400">Space+ Factory · halaman lapangan tanpa login</p>
           </div>
         </div>
 

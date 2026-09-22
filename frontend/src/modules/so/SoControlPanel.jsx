@@ -1,5 +1,5 @@
 // SO Control Panel: antrean approval perubahan SO, riwayat, dan kelola (hapus) SO.
-// Adaptasi dari mockup so-approval-control.html dengan palet Mulia Everything.
+// Adaptasi dari mockup so-approval-control.html dengan palet Space+ Factory.
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

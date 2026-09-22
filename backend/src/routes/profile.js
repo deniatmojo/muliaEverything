@@ -20,7 +20,7 @@ router.get('/profile', async (req, res) => {
     name: user.nama || '',
     email: user.email || '',
     username: user.username || '',
-    position: user.position || 'Karyawan Mulia Everything',
+    position: user.position || 'Karyawan Space+ Factory',
     phone_number: user.phone || '',
     avatar_url: user.avatar_url || '',
   });

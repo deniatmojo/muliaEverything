@@ -49,7 +49,7 @@ export default function Register() {
         <h1 className="text-2xl font-bold text-white tracking-wide">
           BUAT <span className="text-aira-cyan">AKUN</span>
         </h1>
-        <p className="text-gray-300 mt-2 text-sm font-medium">Portal Mulia Everything</p>
+        <p className="text-gray-300 mt-2 text-sm font-medium">Portal Space+ Factory</p>
       </div>
 
       <div className="p-8">

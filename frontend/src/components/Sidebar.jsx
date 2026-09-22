@@ -66,12 +66,12 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        {/* Header Logo Mulia Everything */}
+        {/* Header Logo Space+ Factory */}
         <div className="h-20 flex items-center justify-between px-6 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded bg-aira-cyan flex items-center justify-center font-bold text-white">M</div>
             <h1 className="text-xl font-bold text-white tracking-wide">
-              MULIA <span className="text-aira-cyan">EVERYTHING</span>
+              SPACE+ <span className="text-aira-cyan">FACTORY</span>
             </h1>
           </div>
           <button 
@@ -117,7 +117,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
             <div className="flex flex-col">
-              <p className="text-xs text-gray-400 font-medium">Mulia Enterprise v1.0</p>
+              <p className="text-xs text-gray-400 font-medium">Space+ Factory v1.0</p>
               {currentUser && (
                 <p className="text-[10px] text-aira-cyan mt-0.5 uppercase tracking-wider">{currentUser.role}</p>
               )}

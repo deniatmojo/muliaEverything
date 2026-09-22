@@ -31,7 +31,7 @@ app.use(express.json({ limit: '15mb' })); // lampiran dikirim base64 di dalam JS
 app.use('/uploads', express.static('uploads'));
 
 app.get('/', (req, res) => {
-  res.send('<h1>Mulia Everything API Status: OK 🚀</h1><p>Sistem Backend Aktif (Node + MySQL).</p>');
+  res.send('<h1>Space+ Factory API Status: OK 🚀</h1><p>Sistem Backend Aktif (Node + MySQL).</p>');
 });
 
 app.use('/api/auth', authRoutes);
@@ -53,5 +53,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Mulia backend berjalan di http://localhost:${PORT}`);
+  console.log(`Space+ Factory backend berjalan di http://localhost:${PORT}`);
 });

@@ -1,5 +1,5 @@
 // Upload BOQ versi baru: pilih file → parsing server → preview diff → kirim untuk approval.
-// Adaptasi dari mockup mulia-boq-preview.html dengan palet Mulia Everything.
+// Adaptasi dari mockup mulia-boq-preview.html dengan palet Space+ Factory.
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {

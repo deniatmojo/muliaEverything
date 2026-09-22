@@ -1,4 +1,4 @@
--- Skema database Mulia Everything (MySQL 8.x)
+-- Skema database Space+ Factory (MySQL 8.x)
 -- Jalankan: mysql -u root -p < sql/schema.sql
 
 CREATE DATABASE IF NOT EXISTS mulia_everything

@@ -40,7 +40,7 @@ router.post('/login', async (req, res) => {
     { expiresIn: '7d' }
   );
 
-  await recordLog(user.id, 'LOGIN', 'Berhasil masuk ke dalam portal Mulia Everything');
+  await recordLog(user.id, 'LOGIN', 'Berhasil masuk ke dalam portal Space+ Factory');
 
   return ok(res, 'Login berhasil', {
     token,

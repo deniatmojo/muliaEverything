@@ -14,7 +14,7 @@ import Login from './modules/auth/Login';
 import Register from './modules/auth/Register';
 import Verify from './modules/auth/Verify';
 
-// Import Modul Inti Mulia Everything
+// Import Modul Inti Space+ Factory
 import Developer from './modules/developer/Developer';
 import Pengaturan from './modules/settings/Pengaturan';
 import Profile from './modules/profile/Profile'; 

@@ -1,5 +1,5 @@
 @echo off
-title Mulia Everything - Stopper
+title Space+ Factory - Stopper
 echo Menghentikan Backend dan Frontend...
 
 REM Hentikan proses node yang mendengarkan port 3001 dan 5173

@@ -1,5 +1,5 @@
 // Edit SO: edit manual form project + akumulasi material + frame (MPF).
-// Adaptasi dari mockup edit-so.html dengan palet Mulia Everything.
+// Adaptasi dari mockup edit-so.html dengan palet Space+ Factory.
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {

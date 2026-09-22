@@ -6,7 +6,7 @@ import {
   Edit, Save, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
-// 🌟 KAMUS ALL_MENUS UNTUK RBAC MULIA EVERYTHING
+// 🌟 KAMUS ALL_MENUS UNTUK RBAC SPACE+ FACTORY
 const ALL_MENUS = [
   { path: '/', label: 'Dashboard Utama' },
   { path: '/profil', label: 'Profil Karyawan' },
@@ -198,7 +198,7 @@ export default function Developer() {
         <h2 className="text-2xl font-bold text-aira-navy dark:text-aira-cyan flex items-center gap-3">
           <ShieldAlert size={28} /> Ruang Kendali Developer
         </h2>
-        <p className="text-gray-500 dark:text-gray-400 mt-2">Pusat kendali pengaturan sistem, manajemen role, dan pengguna Mulia Everything.</p>
+        <p className="text-gray-500 dark:text-gray-400 mt-2">Pusat kendali pengaturan sistem, manajemen role, dan pengguna Space+ Factory.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

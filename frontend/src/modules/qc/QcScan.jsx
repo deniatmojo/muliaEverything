@@ -298,7 +298,7 @@ export default function QcScan() {
                 )}
 
                 <p className="text-center text-[10px] text-gray-400 dark:text-gray-500 mt-4">
-                  <Link to="/login" className="hover:underline">Mulia Everything Portal</Link> · QC Traceability
+                  <Link to="/login" className="hover:underline">Space+ Factory Portal</Link> · QC Traceability
                 </p>
               </>
             );

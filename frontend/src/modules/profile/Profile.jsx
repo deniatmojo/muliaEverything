@@ -81,7 +81,7 @@ const Profile = () => {
         if (resProfile.status === 'success') {
           setFormData({
             name: resProfile.data.name || '',
-            position: resProfile.data.position || 'Karyawan Mulia Everything',
+            position: resProfile.data.position || 'Karyawan Space+ Factory',
             phone: resProfile.data.phone_number || '',
             email: resProfile.data.email || '',
             username: resProfile.data.username || '',
@@ -241,7 +241,7 @@ const Profile = () => {
     return (
       <div className="flex flex-col items-center justify-center h-[70vh]">
         <div className="w-10 h-10 border-4 border-[#0084C9] border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm font-medium">Memuat data profil Mulia Everything...</p>
+        <p className="mt-4 text-gray-500 dark:text-gray-400 text-sm font-medium">Memuat data profil Space+ Factory...</p>
       </div>
     );
   }

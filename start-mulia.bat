@@ -1,7 +1,7 @@
 @echo off
-title Mulia Everything - Starter
+title Space+ Factory - Starter
 echo ============================================
-echo   MENYALAKAN PROJECT MULIA EVERYTHING
+echo   MENYALAKAN PROJECT SPACE+ FACTORY
 echo ============================================
 echo.
 

@@ -72,7 +72,7 @@ export default function Login() {
           <span className="text-3xl font-black text-aira-cyan">M</span>
         </div>
         <h1 className="text-2xl font-bold text-white tracking-wide">
-          MULIA <span className="text-aira-cyan">EVERYTHING</span>
+          SPACE+ <span className="text-aira-cyan">FACTORY</span>
         </h1>
         <p className="text-gray-300 mt-2 text-sm font-medium">Enterprise Portal</p>
       </div>

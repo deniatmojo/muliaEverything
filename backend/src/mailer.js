@@ -22,7 +22,7 @@ export async function sendVerificationEmail(to, nama, role, token) {
     `Halo ${nama},\n\nAkun Anda telah disetujui sebagai ${role}.\n\nKlik untuk aktifkan akun Anda:\n${link}\n\nLink ini berlaku 24 jam.`;
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 560px; margin: auto; border: 1px solid #e5e7eb; border-radius: 8px;">
-      <h2 style="color:#0F3B6C; margin-top:0;">MULIA EVERYTHING</h2>
+      <h2 style="color:#0F3B6C; margin-top:0;">SPACE+ FACTORY</h2>
       <p>Halo <b>${nama}</b>,</p>
       <p>Akun Anda telah disetujui sebagai: <b>${role}</b>.</p>
       <p>Silakan klik tombol di bawah untuk mengaktifkan akun Anda (berlaku 24 jam):</p>
@@ -34,9 +34,9 @@ export async function sendVerificationEmail(to, nama, role, token) {
 
   try {
     await transporter.sendMail({
-      from: `"Mulia Everything" <${process.env.SMTP_USER}>`,
+      from: `"Space+ Factory" <${process.env.SMTP_USER}>`,
       to,
-      subject: 'Persetujuan Akun - Mulia Everything',
+      subject: 'Persetujuan Akun - Space+ Factory',
       text,
       html,
     });
