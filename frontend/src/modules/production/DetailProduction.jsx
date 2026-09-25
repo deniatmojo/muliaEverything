@@ -1,82 +1,68 @@
-// Detail Production per SO (halaman "Atur Produksi"): job nyata per mesin dari backend,
-// tombol Update Progress bagi admin, kartu Buffer Stock, generate QR untuk admin produksi
-// lapangan, dan Catatan Produksi (kanal chat SO "#produksi" — terbawa dari modul SO).
+// Detail Production per SO (halaman "Atur Produksi"): item Working Order per mesin
+// (unit eksekusi mesin), progress SO vs BOQ, tombol Update Progress & pause/resume,
+// serta Catatan Produksi (kanal chat SO "#produksi" — terbawa dari modul SO).
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { QRCodeCanvas } from 'qrcode.react';
 import {
   ArrowLeft, LayoutDashboard, Activity, ClipboardList, Factory, ScanLine, Layers, Flame, Paintbrush,
-  ExternalLink, Loader2, Search, MessageSquareText, Send, QrCode, Boxes, Plus, X, Copy, Ban, CheckCircle2,
+  ExternalLink, Loader2, Search, MessageSquareText, Send, Pause, Play, Plus, CheckCircle2,
 } from 'lucide-react';
 import { callApi } from '../../services/api';
 import {
-  MACHINES, STAGES, MACHINE_LABEL, isStockMaterial, jobPct, jobsPct, jobStatusLabel, jobStatusStyle,
+  MACHINES, STAGES, isProductionMaterial, isStockMaterial, pipelineFor, woItemPct, woStatusLabel, woStatusStyle,
 } from './productionData';
 
 const fmtNum = (n) => new Intl.NumberFormat('id-ID').format(n || 0);
 const machineIcon = { factory: Factory, 'scan-line': ScanLine, layers: Layers, flame: Flame, paintbrush: Paintbrush };
-
 const inputCls = 'text-xs font-medium border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-lg px-3 py-2 text-gray-600 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0084C9]/30';
-
-const DURATIONS = [
-  { key: '1d', label: '1 hari' },
-  { key: '7d', label: '7 hari' },
-  { key: '30d', label: '30 hari' },
-  { key: 'production', label: 'Selama produksi' },
-];
 
 export default function DetailProduction() {
   const { soId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [so, setSo] = useState(null);
-  const [jobs, setJobs] = useState([]);
-  const [buffer, setBuffer] = useState([]);
-  const [qrTokens, setQrTokens] = useState([]);
+  const [summary, setSummary] = useState(null); // progress SO vs BOQ per mesin
+  const [woList, setWoList] = useState([]);
+  const [items, setItems] = useState([]); // item WO SO ini
   const [frames, setFrames] = useState([]);
   const [stocks, setStocks] = useState([]);
+  const [materials, setMaterials] = useState([]); // semua material BOQ versi aktif
   const [filterMachine, setFilterMachine] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState(null);
+  const [outputModal, setOutputModal] = useState(null); // { item, qty, note }
 
-  // Modal update progress & generate QR
-  const [outputModal, setOutputModal] = useState(null); // { job, qty, note }
-  const [qrModal, setQrModal] = useState(false);
-  const [qrDuration, setQrDuration] = useState('production');
-  const [qrLoading, setQrLoading] = useState(false);
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
+
+  const load = () => {
+    callApi('PRODUCTION_WO_LIST', { soId }).then((res) => {
+      if (res.status !== 'success') { alert(res.message); navigate('/production'); return; }
+      setWoList(res.data.list || []);
+      setItems(res.data.items || []);
+    });
+    callApi('PRODUCTION_SO_SUMMARY', { soId }).then((res) => {
+      if (res.status === 'success') setSummary(res.data);
+      else setSummary({ overall: 0, perMachine: [] });
+    });
+    callApi('SO_DETAIL', { soId }).then((res) => {
+      if (res.status === 'success') {
+        const d = res.data;
+        setSo(d.so);
+        setMaterials(d.materials || []);
+        setFrames(d.frames || []);
+        setStocks((d.materials || []).filter((m) => m.currency === 'IDR' && !/^MPF(\s|$)/i.test(String(m.articleCode || ''))).filter((m) => !/^(MPU|MPD|MPB)\s/i.test(String(m.articleCode || ''))));
+      }
+      setLoading(false);
+    });
+  };
+  useEffect(() => { load(); }, [soId, navigate]); // eslint-disable-line
 
   // ==== Catatan Produksi (kanal #produksi) ====
   const [notes, setNotes] = useState([]);
   const [draft, setDraft] = useState('');
   const [directory, setDirectory] = useState([]);
   const notesEndRef = useRef(null);
-
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
-
-  const load = () => {
-    callApi('PRODUCTION_JOBS', { soId }).then((res) => {
-      if (res.status !== 'success') { alert(res.message); navigate('/production'); return; }
-      const d = res.data;
-      setSo(d.so); setJobs(d.jobs || []); setBuffer(d.buffer || []); setQrTokens(d.qrTokens || []);
-    });
-  };
-
-  useEffect(() => {
-    setLoading(true);
-    load();
-    callApi('SO_DETAIL', { soId }).then((res) => {
-      if (res.status === 'success') {
-        const d = res.data;
-        setFrames(d.frames || []);
-        setStocks((d.materials || []).filter((m) => m.currency === 'IDR' && !/^MPF(\s|$)/i.test(String(m.articleCode || ''))).filter((m) => !/^(MPU|MPD|MPB)\s/i.test(String(m.articleCode || ''))));
-      }
-      setLoading(false);
-    });
-    callApi('GET_USER_DIRECTORY').then((res) => {
-      if (res.status === 'success') setDirectory(res.data || []);
-    });
-  }, [soId, navigate]); // eslint-disable-line
 
   const loadNotes = () => {
     callApi('GET_SO_CHAT', { soId: `${soId}#produksi` }).then((res) => {
@@ -95,69 +81,49 @@ export default function DetailProduction() {
     loadNotes();
   };
 
-  // ==== Progres nyata per mesin ====
-  const jobsByMachine = useMemo(() => {
+  // ==== Agregasi ====
+  const itemsByMachine = useMemo(() => {
     const out = {};
-    MACHINES.forEach((m) => { out[m.key] = jobs.filter((j) => j.machine === m.key); });
+    MACHINES.forEach((m) => { out[m.key] = items.filter((it) => it.machine === m.key && it.status !== 'cancelled'); });
     return out;
-  }, [jobs]);
+  }, [items]);
 
-  const stagePct = useMemo(() => {
-    const out = {};
-    STAGES.forEach((s) => { out[s.key] = jobsPct(jobsByMachine[s.key]); });
-    return out;
-  }, [jobsByMachine]);
+  // Progress atas MURNI basis BOQ SO (hasil produksi dicocokkan ke total kebutuhan);
+  // item WO yang tidak match BOQ tidak menambah angka apa pun di sini.
+  const overall = summary?.overall ?? 0;
+  const stagePct = (key) => summary?.perMachine?.find((p) => p.machine === key)?.pct ?? 0;
 
-  const overall = useMemo(() => jobsPct(jobs), [jobs]);
-
-  // Buffer stock diagregasi per article|dim|colour (siap dialokasikan kelak)
-  const bufferAgg = useMemo(() => {
-    const map = new Map();
-    buffer.forEach((j) => {
-      const key = `${j.articleCode}|${j.dim1 ?? ''}|${j.colour ?? ''}`;
-      if (!map.has(key)) map.set(key, { articleCode: j.articleCode, dim1: j.dim1, colour: j.colour, qty: 0 });
-      map.get(key).qty += j.qtyDone;
-    });
-    return [...map.values()];
-  }, [buffer]);
-
-  const filteredMats = jobs.filter((j) => {
+  const filteredMats = items.filter((it) => {
     const q = search.toLowerCase().trim();
-    if (q && !String(j.articleCode).toLowerCase().includes(q)) return false;
-    if (filterMachine && j.machine !== filterMachine) return false;
-    if (filterStatus && j.status !== filterStatus) return false;
-    return true;
+    if (q && !String(it.item).toLowerCase().includes(q)) return false;
+    if (filterMachine && it.machine !== filterMachine) return false;
+    if (filterStatus && it.status !== filterStatus) return false;
+    return it.status !== 'cancelled';
   });
 
   const sectionRefs = {
     upright: useRef(null), bracing: useRef(null), beam: useRef(null), welding: useRef(null), painting: useRef(null),
   };
 
-  // ==== Aksi ====
+  // Profil BOQ: material produksi versi aktif (acuan kartu mesin)
+  const prodMats = useMemo(() => materials.filter(isProductionMaterial), [materials]);
+
   const submitOutput = async () => {
-    const { job } = outputModal;
+    const { item } = outputModal;
     const qty = parseFloat(outputModal.qty);
     if (!(qty > 0)) return;
-    const res = await callApi('PRODUCTION_OUTPUT', { jobId: job.id, qty, note: outputModal.note || '' });
+    const res = await callApi('PRODUCTION_WO_OUTPUT', { itemId: item.id, qty, note: outputModal.note || '' });
     if (res.status !== 'success') { alert(res.message); return; }
     setOutputModal(null);
     showToast(res.message);
     load();
   };
 
-  const createQr = async () => {
-    setQrLoading(true);
-    const res = await callApi('PRODUCTION_QR_CREATE', { soId, duration: qrDuration });
-    setQrLoading(false);
+  const itemAction = async (item, action) => {
+    const res = await callApi('PRODUCTION_WO_STATUS', { itemId: item.id, action });
     if (res.status !== 'success') { alert(res.message); return; }
-    setQrTokens((p) => [res.data, ...p]);
-  };
-
-  const revokeQr = async (id) => {
-    if (!confirm('Cabut QR ini? Halaman lapangan yang memakai link ini akan tertutup.')) return;
-    const res = await callApi('PRODUCTION_QR_REVOKE', { id });
-    if (res.status !== 'success') { alert(res.message); return; }
-    setQrTokens((p) => p.filter((t) => t.id !== id));
+    showToast(res.message);
+    load();
   };
 
   if (loading) {
@@ -167,7 +133,24 @@ export default function DetailProduction() {
   const MachineSection = ({ mkey }) => {
     const meta = MACHINES.find((m) => m.key === mkey);
     const Icon = machineIcon[meta.icon];
-    const items = jobsByMachine[mkey];
+    // Acuan kartu = BOQ: material produksi yang pipelinenya melewati mesin ini.
+    // Hasil produksi HANYA dihitung dari WO item di mesin ini sendiri
+    // (WO painting terpisah — output bracing/beam tidak ikut mengisi painting).
+    const profil = prodMats.filter((m) => pipelineFor(m.articleCode, m.colour).includes(mkey));
+    const woItems = itemsByMachine[mkey];
+    const producedHere = new Map();
+    woItems.filter((it) => it.status !== 'cancelled' && it.qtyDone > 0).forEach((it) => {
+      const key = `${String(it.item).trim()}|${String(it.lengthMm ?? '').trim()}`;
+      producedHere.set(key, (producedHere.get(key) || 0) + it.qtyDone);
+    });
+    let totalTarget = 0, totalDone = 0;
+    profil.forEach((m) => {
+      const key = `${String(m.articleCode).trim()}|${String(m.dim1 ?? '').trim()}`;
+      totalTarget += m.qty;
+      totalDone += Math.min(producedHere.get(key) || 0, m.qty);
+    });
+    const pct = totalTarget > 0 ? Math.round((totalDone / totalTarget) * 100) : 0;
+
     return (
       <section ref={sectionRefs[mkey]} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 scroll-mt-24">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -177,42 +160,67 @@ export default function DetailProduction() {
             </div>
             <div>
               <p className="text-sm font-bold text-gray-900 dark:text-white">{meta.name}</p>
-              <p className="text-xs text-gray-400">{items.filter((j) => j.status === 'running').length} job berjalan · {items.length} total job</p>
+              <p className="text-xs text-gray-400">{profil.length} profil material BOQ · {woItems.filter((i) => i.status === 'running').length} WO berjalan</p>
             </div>
           </div>
-          <span className="text-xs font-semibold text-gray-400">{items.length} job</span>
+          <span className="text-xs font-semibold text-gray-400">{fmtNum(totalDone)}/{fmtNum(totalTarget)} pcs · {pct}%</span>
         </div>
+
         <div className="flex flex-wrap gap-3">
-          {items.length === 0 && <p className="text-xs text-gray-400 py-4">Tidak ada job di mesin ini.</p>}
-          {items.map((j) => {
-            const pct = jobPct(j);
+          {profil.length === 0 && <p className="text-xs text-gray-400 py-4">Tidak ada material BOQ yang melewati mesin ini untuk SO tersebut.</p>}
+          {profil.map((m, idx) => {
+            const key = `${String(m.articleCode).trim()}|${String(m.dim1 ?? '').trim()}`;
+            const diproduksi = Math.min(producedHere.get(key) || 0, m.qty);
+            const mPct = m.qty > 0 ? Math.round((diproduksi / m.qty) * 100) : 0;
+            const status = mPct >= 100 ? 'done' : diproduksi > 0 ? 'running' : 'queued';
+            const chips = woItems.filter((it) => String(it.item).trim() === String(m.articleCode).trim()
+              && String(it.lengthMm ?? '').trim() === String(m.dim1 ?? '').trim() && it.status !== 'cancelled');
             return (
-              <div key={j.id} className="bg-gray-50 dark:bg-gray-900/40 rounded-xl p-3 flex flex-col gap-2 min-w-[210px] flex-1">
+              <div key={idx} className={`bg-gray-50 dark:bg-gray-900/40 rounded-xl p-3 flex flex-col gap-2 min-w-[230px] flex-1 ${status === 'running' ? 'ring-1 ring-[#0084C9]/40' : ''}`}>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-bold text-gray-800 dark:text-gray-100">{j.articleCode}</p>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${jobStatusStyle[j.status]}`}>{jobStatusLabel[j.status]}</span>
+                  <p className="text-xs font-bold text-gray-800 dark:text-gray-100">{m.articleCode}</p>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${woStatusStyle[status]}`}>{woStatusLabel[status]}</span>
                 </div>
-                <p className="text-[11px] text-gray-400">{j.dim1 ?? '-'} · {j.colour ?? '-'} · {fmtNum(j.qtyDone)}/{fmtNum(j.qtyTarget)} pcs</p>
+                <p className="text-[11px] text-gray-400">{m.dim1 ?? '-'} mm · {m.colour ?? '-'}{String(m.colour || '').toUpperCase() === 'GALVA' ? ' (skip painting)' : ''} · Target {fmtNum(m.qty)} pcs</p>
                 <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                  <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${mPct}%` }} />
                 </div>
-                <button onClick={() => setOutputModal({ job: j, qty: '', note: '' })}
-                  disabled={j.status === 'done'}
-                  className={`mt-1 text-[11px] font-semibold px-2 py-1.5 rounded-lg flex items-center justify-center gap-1 ${
-                    j.status === 'done'
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
-                      : 'bg-aira-navy dark:bg-aira-cyan text-white dark:text-gray-900 hover:opacity-90'}`}>
-                  <Plus size={11} /> {j.status === 'done' ? 'Selesai' : 'Update Progress'}
-                </button>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">Diproduksi {fmtNum(diproduksi)} pcs · {mPct}%</p>
+
+                {/* Chip item WO yang mengerjakan material ini di mesin ini */}
+                {chips.length === 0 ? (
+                  <p className="text-[10px] text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-2">Belum ada WO untuk material ini.</p>
+                ) : chips.map((it) => (
+                  <div key={it.id} className="border-t border-gray-200 dark:border-gray-700 pt-2 flex items-center gap-1.5">
+                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold ${woStatusStyle[it.status]}`}>{it.woId.replace('WO-', '')}</span>
+                    <span className="text-[10px] text-gray-400 flex-1 truncate">{fmtNum(it.qtyDone)}/{fmtNum(it.qtyTarget)} {it.unit}</span>
+                    <button onClick={() => setOutputModal({ item: it, qty: '', note: '' })}
+                      disabled={it.status === 'done'}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-lg flex items-center justify-center gap-0.5 ${
+                        it.status === 'done' ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
+                        : 'bg-aira-navy dark:bg-aira-cyan text-white dark:text-gray-900 hover:opacity-90'}`}>
+                      <Plus size={10} /> Update
+                    </button>
+                    {it.status === 'running' && (
+                      <button onClick={() => itemAction(it, 'pause')} title="Pause"
+                        className="px-1.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400"><Pause size={10} /></button>
+                    )}
+                    {it.status === 'paused' && (
+                      <button onClick={() => itemAction(it, 'resume')} title="Lanjutkan"
+                        className="px-1.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-400/10 text-emerald-600 dark:text-emerald-400"><Play size={10} /></button>
+                    )}
+                  </div>
+                ))}
               </div>
             );
           })}
         </div>
+
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-4 mb-1">
-          <span>Progress kumulatif mesin</span><span>{stagePct[mkey]}%</span>
+          <span>Progress mesin (vs kebutuhan BOQ)</span><span>{stagePct(mkey)}%</span>
         </div>
         <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-          <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${stagePct[mkey]}%` }} />
+          <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${stagePct(mkey)}%` }} />
         </div>
       </section>
     );
@@ -242,16 +250,10 @@ export default function DetailProduction() {
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{so?.project_name || '-'} · {so?.customer || '-'}</p>
           </div>
         </div>
-        <div className="flex gap-2 self-start sm:self-auto">
-          <button onClick={() => setQrModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-[#0EA5A5] hover:bg-[#0b8787] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors">
-            <QrCode size={13} /> Generate QR Lapangan
-          </button>
-          <button onClick={() => navigate(`/so/detail/${soId}`)}
-            className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5">
-            <ExternalLink size={13} /> Buka Detail SO
-          </button>
-        </div>
+        <button onClick={() => navigate(`/so/detail/${soId}`)}
+          className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1.5 self-start sm:self-auto">
+          <ExternalLink size={13} /> Buka Detail SO
+        </button>
       </div>
 
       {/* Toast */}
@@ -261,7 +263,7 @@ export default function DetailProduction() {
         </div>
       )}
 
-      {/* Nav pill (Detail Production aktif) */}
+      {/* Nav pill */}
       <div className="sticky top-0 z-10 -mx-4 lg:-mx-8 px-4 lg:px-8 py-1.5">
         <div className="flex justify-center">
           <div className="inline-flex gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-full p-1.5 shadow-sm max-w-full">
@@ -289,7 +291,7 @@ export default function DetailProduction() {
           {/* Ringkasan progress */}
           <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <h2 className="font-bold text-gray-900 dark:text-white">Ringkasan Progress</h2>
+              <h2 className="font-bold text-gray-900 dark:text-white">Ringkasan Progress (vs BOQ)</h2>
               <span className="text-xs text-gray-400">Klik tahap untuk lompat ke bagian mesin</span>
             </div>
             <div className="flex items-center justify-between mb-4">
@@ -301,7 +303,7 @@ export default function DetailProduction() {
             </div>
             <div className="flex items-center justify-between">
               {STAGES.map((s, i) => {
-                const pct = stagePct[s.key];
+                const pct = stagePct(s.key);
                 return (
                   <React.Fragment key={s.key}>
                     <div className="flex flex-col items-center">
@@ -320,12 +322,47 @@ export default function DetailProduction() {
             </div>
           </section>
 
-          {/* Job per mesin */}
+          {/* Section per mesin (item WO) */}
           {MACHINES.map((m) => <MachineSection key={m.key} mkey={m.key} />)}
 
-          {/* Pemetaan material (tabel ringkas dari job) */}
+          {/* Daftar WO */}
           <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
-            <h2 className="font-bold text-gray-900 dark:text-white mb-3">Pemetaan Material ke Mesin</h2>
+            <h2 className="font-bold text-gray-900 dark:text-white mb-3">Working Order SO Ini</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 dark:bg-gray-900/60 text-gray-500 dark:text-gray-400 uppercase">
+                  <tr>
+                    {['No. WO', 'Prepared By', 'Item', 'Progress', 'Tanggal'].map((h) => (
+                      <th key={h} className="font-semibold px-3 py-2.5 text-left">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {woList.length === 0 && <tr><td colSpan="5" className="text-center text-gray-400 py-6">Belum ada WO untuk SO ini.</td></tr>}
+                  {woList.map((w) => (
+                    <tr key={w.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-3 py-2.5 font-bold text-aira-navy dark:text-aira-cyan whitespace-nowrap">{w.id}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">{w.preparedBy || '-'}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">{w.jumlahItem} item</td>
+                      <td className="px-3 py-2.5 w-40">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${w.progress}%` }} />
+                          </div>
+                          <span className="text-[10px] text-gray-400 w-8">{w.progress}%</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-400 whitespace-nowrap">{new Date(w.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Pemetaan item WO */}
+          <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+            <h2 className="font-bold text-gray-900 dark:text-white mb-3">Daftar Item WO</h2>
             <div className="flex flex-wrap gap-2 mb-4">
               <select value={filterMachine} onChange={(e) => setFilterMachine(e.target.value)} className={inputCls}>
                 <option value="">Semua Mesin</option>
@@ -333,45 +370,45 @@ export default function DetailProduction() {
               </select>
               <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={inputCls}>
                 <option value="">Semua Status</option>
-                {['queued', 'running', 'paused', 'done'].map((s) => <option key={s} value={s}>{jobStatusLabel[s]}</option>)}
+                {['queued', 'running', 'paused', 'done'].map((s) => <option key={s} value={s}>{woStatusLabel[s]}</option>)}
               </select>
               <div className="relative flex-1 min-w-[180px]">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari article code..." className={`${inputCls} w-full pl-8`} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari item / article code..." className={`${inputCls} w-full pl-8`} />
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 dark:bg-gray-900/60 text-gray-500 dark:text-gray-400 uppercase">
                   <tr>
-                    {['Article Code', 'Dim', 'Colour', 'Mesin', 'Qty Selesai', 'Qty Target', 'Progress', 'Status'].map((h, i) => (
+                    {['Item', 'Length (mm)', 'Mesin', 'WO', 'Qty Selesai', 'Qty Target', 'Progress', 'Status'].map((h, i) => (
                       <th key={h} className={`font-semibold px-3 py-2.5 ${i === 4 || i === 5 ? 'text-right' : 'text-left'}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {filteredMats.length === 0 && <tr><td colSpan="8" className="text-center text-gray-400 py-6">Tidak ada job yang cocok. Job dibuat otomatis dari material produksi MPU/MPD/MPB lokal versi BOQ aktif.</td></tr>}
-                  {filteredMats.map((j) => {
-                    const machine = MACHINES.find((x) => x.key === j.machine);
+                  {filteredMats.length === 0 && <tr><td colSpan="8" className="text-center text-gray-400 py-6">Tidak ada item WO yang cocok.</td></tr>}
+                  {filteredMats.map((it) => {
+                    const machine = MACHINES.find((x) => x.key === it.machine);
                     return (
-                      <tr key={j.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                        <td className="px-3 py-2.5 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{j.articleCode}</td>
-                        <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">{j.dim1 ?? '-'}</td>
-                        <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">{j.colour ?? '-'}</td>
+                      <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                        <td className="px-3 py-2.5 font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{it.item}{it.reqGalva ? ' · GALVA' : ''}</td>
+                        <td className="px-3 py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">{it.lengthMm ?? '-'}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-aira-navy/10 text-aira-navy dark:bg-aira-cyan/20 dark:text-aira-cyan">{machine.short}</span>
                         </td>
-                        <td className="px-3 py-2.5 text-right whitespace-nowrap">{fmtNum(Math.min(j.qtyDone, j.qtyTarget))}</td>
-                        <td className="px-3 py-2.5 text-right whitespace-nowrap">{fmtNum(j.qtyTarget)}</td>
+                        <td className="px-3 py-2.5 text-gray-400 whitespace-nowrap">{it.woId}</td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">{fmtNum(Math.min(it.qtyDone, it.qtyTarget))}</td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">{fmtNum(it.qtyTarget)} {it.unit}</td>
                         <td className="px-3 py-2.5 w-32">
                           <div className="flex items-center gap-1.5">
                             <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                              <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${jobPct(j)}%` }} />
+                              <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${woItemPct(it)}%` }} />
                             </div>
-                            <span className="text-[10px] text-gray-400 w-8">{jobPct(j)}%</span>
+                            <span className="text-[10px] text-gray-400 w-8">{woItemPct(it)}%</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${jobStatusStyle[j.status]}`}>{jobStatusLabel[j.status]}</span></td>
+                        <td className="px-3 py-2.5"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${woStatusStyle[it.status]}`}>{woStatusLabel[it.status]}</span></td>
                       </tr>
                     );
                   })}
@@ -379,23 +416,8 @@ export default function DetailProduction() {
               </table>
             </div>
 
-            {/* Buffer stock, frame & stock */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
-              <div className="rounded-xl border border-sky-100 dark:border-sky-900/40 bg-sky-50/40 dark:bg-sky-900/10 p-3.5">
-                <p className="text-xs font-bold text-[#0084C9] dark:text-sky-400 mb-2 flex items-center gap-1.5"><Boxes size={12} /> Buffer Stock (hasil produksi tersisa)</p>
-                <div className="space-y-2">
-                  {bufferAgg.length === 0 && <p className="text-xs text-gray-400">Belum ada buffer. Terasa otomatis ketika BOQ berubah dan hasil produksi tak lagi terpakai.</p>}
-                  {bufferAgg.map((b, i) => (
-                    <div key={i} className="flex items-start justify-between gap-2 text-xs">
-                      <div>
-                        <p className="font-semibold text-gray-700 dark:text-gray-200">{b.articleCode} · {fmtNum(b.qty)} pcs</p>
-                        <p className="text-gray-400">{b.dim1 ? `Dim ${b.dim1}` : ''}{b.colour ? ` · ${b.colour}` : ''}</p>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/40 text-[#0084C9] dark:text-sky-400 text-[10px] font-semibold shrink-0">Buffer</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Frame & stock */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
               <div className="rounded-xl border border-gray-100 dark:border-gray-700 p-3.5">
                 <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Informasi Frame (MPF) — assembly, bukan material</p>
                 <div className="space-y-2">
@@ -442,7 +464,6 @@ export default function DetailProduction() {
               </div>
               <span className="text-[11px] text-gray-400">{notes.length} catatan</span>
             </div>
-
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
               {notes.length === 0 && <p className="text-center text-xs text-gray-400 py-8">Belum ada catatan produksi. Catatan dari modul SO kanal produksi akan tampil di sini.</p>}
               {notes.map((n) => (
@@ -462,7 +483,6 @@ export default function DetailProduction() {
               ))}
               <div ref={notesEndRef} />
             </div>
-
             <div className="p-3 border-t border-gray-100 dark:border-gray-700">
               <div className="flex items-end gap-2">
                 <input value={draft} onChange={(e) => setDraft(e.target.value)}
@@ -484,14 +504,13 @@ export default function DetailProduction() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOutputModal(null)} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xl w-full max-w-sm p-5">
-            <button onClick={() => setOutputModal(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-white"><X size={16} /></button>
             <h3 className="font-bold text-gray-900 dark:text-white mb-1">Update Progress</h3>
-            <p className="text-xs text-gray-400 mb-4">{outputModal.job.articleCode} · {MACHINE_LABEL[outputModal.job.machine]} · {outputModal.job.dim1 ?? '-'}</p>
+            <p className="text-xs text-gray-400 mb-4">{outputModal.item.item} · {MACHINES.find((m) => m.key === outputModal.item.machine).name} · {outputModal.item.woId}</p>
             <div className="bg-gray-50 dark:bg-gray-900/40 rounded-xl p-3 text-xs text-gray-500 dark:text-gray-400 mb-4 flex justify-between">
-              <span>Sudah: <b className="text-gray-800 dark:text-gray-100">{fmtNum(outputModal.job.qtyDone)}</b> / {fmtNum(outputModal.job.qtyTarget)} pcs</span>
-              <span>Sisa: {fmtNum(Math.max(0, outputModal.job.qtyTarget - outputModal.job.qtyDone))}</span>
+              <span>Sudah: <b className="text-gray-800 dark:text-gray-100">{fmtNum(outputModal.item.qtyDone)}</b> / {fmtNum(outputModal.item.qtyTarget)} {outputModal.item.unit}</span>
+              <span>Sisa: {fmtNum(Math.max(0, outputModal.item.qtyTarget - outputModal.item.qtyDone))}</span>
             </div>
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Qty output baru (pcs)</label>
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-300">Qty hasil produksi ({outputModal.item.unit})</label>
             <input type="number" min="1" autoFocus value={outputModal.qty}
               onChange={(e) => setOutputModal((p) => ({ ...p, qty: e.target.value }))}
               className="w-full mt-1 mb-3 text-sm font-semibold border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 rounded-xl px-3 py-2.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-[#0084C9]/30" />
@@ -503,52 +522,6 @@ export default function DetailProduction() {
               <button onClick={() => setOutputModal(null)} className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Batal</button>
               <button onClick={submitOutput} className="flex-1 px-3 py-2.5 rounded-xl bg-gradient-to-r from-[#0084C9] to-[#0EA5A5] text-white text-xs font-semibold hover:opacity-90">Simpan Output</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== MODAL GENERATE QR ===== */}
-      {qrModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setQrModal(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <button onClick={() => setQrModal(false)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 dark:hover:text-white"><X size={16} /></button>
-            <h3 className="font-bold text-gray-900 dark:text-white mb-1">QR untuk Admin Produksi Lapangan</h3>
-            <p className="text-xs text-gray-400 mb-4">Admin lapangan cukup scan QR ini untuk membuka form update progress — tanpa login. Pilih masa berlaku lalu generate.</p>
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {DURATIONS.map((d) => (
-                <button key={d.key} onClick={() => setQrDuration(d.key)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${qrDuration === d.key ? 'bg-gradient-to-r from-[#0084C9] to-[#0EA5A5] text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white border border-gray-200 dark:border-gray-600'}`}>
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            <button onClick={createQr} disabled={qrLoading}
-              className="w-full mb-4 px-3 py-2.5 rounded-xl bg-[#0EA5A5] hover:bg-[#0b8787] text-white text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60">
-              {qrLoading ? <Loader2 size={13} className="animate-spin" /> : <QrCode size={13} />} Generate QR ({DURATIONS.find((d) => d.key === qrDuration).label})
-            </button>
-
-            {qrTokens.map((t) => (
-              <div key={t.id} className="border border-gray-100 dark:border-gray-700 rounded-xl p-3 mb-3">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-gray-400">Berlaku s.d. {new Date(t.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                  <button onClick={() => revokeQr(t.id)} className="text-[11px] font-semibold text-rose-500 hover:text-rose-600 flex items-center gap-1"><Ban size={11} /> Cabut</button>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="bg-white p-2 rounded-lg border border-gray-100 shrink-0">
-                    <QRCodeCanvas value={t.url} size={96} includeMargin={false} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 mb-1 truncate">{t.url}</p>
-                    <button onClick={() => { navigator.clipboard?.writeText(t.url); showToast('Link QR dikopi ke clipboard'); }}
-                      className="text-[11px] font-semibold text-aira-navy dark:text-aira-cyan hover:underline flex items-center gap-1">
-                      <Copy size={11} /> Kopi link
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {qrTokens.length === 0 && <p className="text-xs text-gray-400 text-center py-2">Belum ada QR aktif untuk SO ini.</p>}
           </div>
         </div>
       )}

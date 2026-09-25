@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { callApi } from '../../services/api';
 import { MACHINES } from './productionData';
+import WorkingOrder from './WorkingOrder';
 
 const TABS = [
   { key: 'dashboard', label: 'Dashboard', short: 'Dash', icon: LayoutDashboard },
@@ -194,61 +195,10 @@ export default function ProductionHome() {
         </div>
       )}
 
-      {/* ============ TAB ON GOING ============ */}
+      {/* ============ TAB ON GOING: WORKING ORDER ============ */}
       {tab === 'ongoing' && (
-        <div className="space-y-8">
-          <div>
-            <h2 className="font-bold text-gray-900 dark:text-white mb-1">Status Mesin Hari Ini — {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</h2>
-            <p className="text-xs text-gray-400 mb-4">Job yang sedang dikerjakan (dari pencatatan output operator)</p>
-            <div className="space-y-3">
-              {loading && <p className="text-sm text-gray-400 py-4 text-center"><Loader2 size={18} className="animate-spin inline mr-2" />Memuat…</p>}
-              {!loading && (ov?.ongoing || []).length === 0 && (
-                <p className="text-sm text-gray-400 py-6 text-center">Belum ada job yang berjalan. Job mulai berjalan saat output pertama dicatat.</p>
-              )}
-              {(ov?.ongoing || []).map((j) => {
-                const meta = MACHINES.find((m) => m.key === j.machine);
-                const Icon = machineIcon[meta.icon];
-                const st = statusMap.running;
-                const pct = j.qtyTarget > 0 ? Math.round((Math.min(j.qtyDone, j.qtyTarget) / j.qtyTarget) * 100) : 0;
-                return (
-                  <div key={j.id} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4">
-                    <div className="flex flex-wrap items-center gap-4">
-                      <div className="flex items-center gap-3 w-56 shrink-0">
-                        <div className="w-10 h-10 rounded-xl bg-aira-navy/10 dark:bg-aira-cyan/20 flex items-center justify-center text-aira-navy dark:text-aira-cyan">
-                          <Icon size={19} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-gray-900 dark:text-white">{meta.name}</p>
-                          <p className="text-xs text-gray-400 truncate">{j.customer}</p>
-                        </div>
-                      </div>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${st.bg} ${st.text}`}>
-                        <span className="w-1.5 h-1.5 rounded-full ${st.dot} animate-pulse" />{st.label}
-                      </span>
-                      <div className="flex flex-wrap gap-3 flex-1">
-                        <div className="flex-1 min-w-[220px] bg-gray-50 dark:bg-gray-900/40 rounded-xl p-3">
-                          <p className="text-xs font-bold text-aira-navy dark:text-aira-cyan">{j.soId}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{j.articleCode} · {j.dim1 ?? '-'} · {j.colour ?? '-'}</p>
-                          <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mb-1">
-                            <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${pct}%` }} />
-                          </div>
-                          <div className="flex justify-between text-[11px] text-gray-400">
-                            <span>{fmtNum(j.qtyDone)}/{fmtNum(j.qtyTarget)} pcs</span><span>{pct}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Kartu project */}
-          <div>
-            <h2 className="font-bold text-gray-900 dark:text-white mb-3">Project Sedang Produksi</h2>
-            <ProjectCards projects={ov?.projects || []} loading={loading} onOpen={(id) => navigate(`/production/${id}`)} />
-          </div>
+        <div className="space-y-6">
+          <WorkingOrder projects={ov?.projects || []} projectsLoading={loading} onOpenProject={(id) => navigate(`/production/${id}`)} />
         </div>
       )}
 
@@ -318,30 +268,5 @@ const ProjectTable = ({ projects, loading, onOpen, hint }) => (
         </tbody>
       </table>
     </div>
-  </div>
-);
-
-const ProjectCards = ({ projects, loading, onOpen }) => (
-  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    {projects.map((s) => {
-      // Estimasi progress per tahap dari job yang tersedia di overview tidak dibawa per SO;
-      // kartu menampilkan progress keseluruhan per project.
-      return (
-        <div key={s.id} onClick={() => onOpen(s.id)}
-          className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-4 cursor-pointer hover:border-[#0084C9]/40 transition-colors">
-          <p className="text-xs font-bold text-aira-navy dark:text-aira-cyan">{s.id}</p>
-          <p className="text-sm font-bold text-gray-900 dark:text-white">{s.project_name || '-'}</p>
-          <p className="text-xs text-gray-400 mb-3">{s.customer || '-'}</p>
-          <div className="flex justify-between text-[11px] text-gray-400 mb-1">
-            <span>{fmtNum(s.totalDone)}/{fmtNum(s.totalTarget)} pcs</span>
-            <span className="font-bold text-aira-navy dark:text-aira-cyan">{s.progress}%</span>
-          </div>
-          <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-[#0084C9] to-[#0EA5A5]" style={{ width: `${s.progress}%` }} />
-          </div>
-        </div>
-      );
-    })}
-    {loading && <div className="text-center text-gray-400 text-sm py-8"><Loader2 size={20} className="animate-spin inline mr-2" />Memuat…</div>}
   </div>
 );

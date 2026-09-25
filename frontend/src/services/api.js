@@ -56,15 +56,22 @@ const ROUTES = {
   // === Modul Maintenance ===
   GET_MAINTENANCE_TEAM:  { method: 'GET',  path: () => '/maintenance/team' },
 
-  // === Modul Production (job per mesin, output operator, QR lapangan) ===
-  PRODUCTION_OVERVIEW:   { method: 'GET',  path: () => '/production/overview' },
-  PRODUCTION_BUFFER:     { method: 'GET',  path: () => '/production/buffer-stock' },
-  PRODUCTION_JOBS:       { method: 'GET',  path: (d) => `/production/${encodeURIComponent(d.soId)}/jobs` },
-  PRODUCTION_OUTPUT:     { method: 'POST', path: (d) => `/production/jobs/${encodeURIComponent(d.jobId)}/output` },
-  PRODUCTION_QR_CREATE:  { method: 'POST', path: (d) => `/production/${encodeURIComponent(d.soId)}/qr` },
-  PRODUCTION_QR_REVOKE:  { method: 'POST', path: (d) => `/production/qr/${encodeURIComponent(d.id)}/revoke` },
-  PRODUCTION_SCAN_GET:   { method: 'GET',  path: (d) => `/production/public/${encodeURIComponent(d.token)}`, noAuth: true },
-  PRODUCTION_SCAN_OUTPUT:{ method: 'POST', path: (d) => `/production/public/${encodeURIComponent(d.token)}/output`, noAuth: true },
+  // === Modul Production — Working Order (WO) ===
+  PRODUCTION_OVERVIEW:        { method: 'GET',  path: () => '/production/overview' },
+  PRODUCTION_BUFFER:          { method: 'GET',  path: () => '/production/buffer-stock' },
+  PRODUCTION_WO_CREATE:       { method: 'POST', path: () => '/production/wo' },
+  PRODUCTION_WO_LIST:         { method: 'GET',  path: (d) => `/production/wo${d?.soId ? `?soId=${encodeURIComponent(d.soId)}` : ''}` },
+  PRODUCTION_WO_DETAIL:       { method: 'GET',  path: (d) => `/production/wo/${encodeURIComponent(d.woId)}` },
+  PRODUCTION_QUEUE:           { method: 'GET',  path: () => '/production/queue' },
+  PRODUCTION_WO_OUTPUT:       { method: 'POST', path: (d) => `/production/wo/items/${encodeURIComponent(d.itemId)}/output` },
+  PRODUCTION_WO_STATUS:       { method: 'POST', path: (d) => `/production/wo/items/${encodeURIComponent(d.itemId)}/status` },
+  PRODUCTION_QUEUE_REORDER:   { method: 'POST', path: () => '/production/queue/reorder' },
+  PRODUCTION_MACHINES:        { method: 'GET',  path: () => '/production/machines' },
+  PRODUCTION_MACHINE_CODE:    { method: 'POST', path: (d) => `/production/machines/${encodeURIComponent(d.machine)}/code` },
+  PRODUCTION_SO_SUMMARY:      { method: 'GET',  path: (d) => `/production/so/${encodeURIComponent(d.soId)}/summary` },
+  PRODUCTION_MACHINE_VERIFY:  { method: 'POST', path: (d) => `/production/public/machine/${encodeURIComponent(d.machine)}/verify`, noAuth: true },
+  PRODUCTION_MACHINE_QUEUE:   { method: 'GET',  path: (d) => `/production/public/machine/${encodeURIComponent(d.machine)}?code=${encodeURIComponent(d.code || '')}`, noAuth: true },
+  PRODUCTION_MACHINE_OUTPUT:  { method: 'POST', path: (d) => `/production/public/machine/${encodeURIComponent(d.machine)}/output`, noAuth: true },
 
   // === Modul QC Traceability ===
   QC_LIST_ITEMS:        { method: 'GET',  path: (d) => `/qc/items?search=${encodeURIComponent(d.search || '')}&type=${encodeURIComponent(d.type || 'all')}` },

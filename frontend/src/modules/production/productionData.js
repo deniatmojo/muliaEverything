@@ -59,23 +59,22 @@ export function pipelineFor(articleCode, colour) {
   return stages;
 }
 
-// ==== Helper job (bentuk data dari backend routes/production.js) ====
+// ==== Helper item WO (bentuk data dari backend routes/production.js) ====
 
-export const jobPct = (j) => (j.qtyTarget > 0 ? Math.min(100, Math.round((j.qtyDone / j.qtyTarget) * 100)) : 0);
+export const woItemPct = (it) => (it.qtyTarget > 0 ? Math.min(100, Math.round((it.qtyDone / it.qtyTarget) * 100)) : 0);
 
-export const jobStatusLabel = { queued: 'Queued', running: 'Running', paused: 'Paused', done: 'Done', buffered: 'Buffer Stock', cancelled: 'Cancelled' };
-export const jobStatusStyle = {
+export const woStatusLabel = { queued: 'Menunggu', running: 'Berjalan', paused: 'Pause', done: 'Selesai', cancelled: 'Dibatalkan' };
+export const woStatusStyle = {
   running: 'bg-emerald-50 dark:bg-emerald-400/10 text-emerald-700 dark:text-emerald-300',
   queued: 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300',
   paused: 'bg-amber-50 dark:bg-amber-400/10 text-amber-700 dark:text-amber-300',
   done: 'bg-teal-50 dark:bg-teal-400/10 text-teal-700 dark:text-teal-300',
-  buffered: 'bg-sky-50 dark:bg-sky-900/30 text-[#0084C9] dark:text-sky-400',
   cancelled: 'bg-gray-100 dark:bg-gray-700 text-gray-400',
 };
 
-// Progres kumulatif sekumpulan job (dipakai stepper & widget)
-export function jobsPct(jobs) {
-  const total = jobs.reduce((a, j) => a + j.qtyTarget, 0);
-  const done = jobs.reduce((a, j) => a + Math.min(j.qtyDone, j.qtyTarget), 0);
+// Progres kumulatif sekumpulan item WO
+export function woItemsPct(items) {
+  const total = items.reduce((a, it) => a + it.qtyTarget, 0);
+  const done = items.reduce((a, it) => a + Math.min(it.qtyDone, it.qtyTarget), 0);
   return total > 0 ? Math.round((done / total) * 100) : 0;
 }

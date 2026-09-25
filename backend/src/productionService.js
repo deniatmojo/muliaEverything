@@ -1,12 +1,12 @@
-// Service modul Production: generate job dari material BOQ versi aktif, rekonsiliasi
-// saat versi berubah (hasil produksi jadi buffer stock), dan hitung progress SO.
-// Membaca data SO secara read-only; satu-satunya penulisan ke modul SO adalah
-// kolom so.progress (disetujui pemilik aplikasi).
+// Service modul Production — basis WORKING ORDER (WO):
+// job mesin kini berasal dari WO yang diupload admin (bukan digenerate dari BOQ).
+// Menulis balik so.progress: hasil WO dicocokkan ke total kebutuhan BOQ versi aktif.
 import { pool } from './db.js';
+
+export const MACHINES = ['upright', 'bracing', 'beam', 'welding', 'painting'];
 
 // ==== Aturan domain produksi (cermin productionData.js di frontend) ====
 
-// MPU -> roll upright | MPD -> roll bracing | MPB -> roll beam lalu welding
 export function mapMaterialToMachine(articleCode) {
   const code = String(articleCode || '').trim().toUpperCase();
   if (/^MPU\s/.test(code)) return 'upright';
@@ -17,151 +17,155 @@ export function mapMaterialToMachine(articleCode) {
 
 // Material produksi = lokal IDR, MPU/MPD/MPB (MPF frame & safety pin bukan produksi)
 export function isProductionMaterial(m) {
-  if (m.currency !== 'IDR') return false;
-  return mapMaterialToMachine(m.article_code ?? m.articleCode) !== null;
-}
-
-// Tahapan pipeline: MPB -> beam + welding; semua lewat painting kecuali GALVA
-export function pipelineFor(articleCode, colour) {
-  const machine = mapMaterialToMachine(articleCode);
-  const isGalva = String(colour || '').trim().toUpperCase() === 'GALVA';
-  const stages = [];
-  if (machine === 'upright') stages.push('upright');
-  if (machine === 'bracing') stages.push('bracing');
-  if (machine === 'beam') stages.push('beam', 'welding');
-  if (!isGalva) stages.push('painting');
-  return stages;
+  if ((m.currency || '').toUpperCase() !== 'IDR') return false;
+  const code = String(m.article_code || '').trim().toUpperCase();
+  if (/^MPF(\s|$)/.test(code)) return false;
+  if (/SAFETY/.test(code) || /^MSP\s/.test(code)) return false;
+  return mapMaterialToMachine(code) !== null;
 }
 
 // ====================================================================
-// GENERATE / REKONSILIASI JOB TERHADAP VERSI AKTIF
-// - Job dibuat sekaligus untuk semua tahap pipeline (produksi paralel).
-// - Bila versi aktif berganti: job lama dicocokkan ke material versi baru
-//   (key: machine|article|dim1|dim2|colour). Job tanpa pasangan & sudah
-//   menghasilkan output -> 'buffered' (buffer stock); belum menghasilkan -> 'cancelled'.
+// NOMOR WO: WO-YYYYMMDD-001 (reset per hari)
 // ====================================================================
-
-const JOB_KEY = (m) => `${m.machine}|${m.article}|${m.dim1 ?? ''}|${m.dim2 ?? ''}|${m.colour ?? ''}`;
-
-export async function ensureJobsForActiveVersion(soId, userId = null) {
-  const [[so]] = await pool.query('SELECT id, active_version_id FROM so WHERE id = ?', [soId]);
-  if (!so) return { error: 'SO tidak ditemukan' };
-  if (!so.active_version_id) return { error: 'SO belum memiliki versi material aktif' };
-
-  const [materials] = await pool.query(
-    'SELECT * FROM so_materials WHERE version_id = ?',
-    [so.active_version_id]
+export async function nextWoId() {
+  const today = new Date();
+  const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+  const [[row]] = await pool.query(
+    "SELECT COUNT(*) AS n FROM production_wo WHERE id LIKE ?", [`WO-${ymd}-%`]
   );
-  const prodMaterials = materials.filter(isProductionMaterial);
+  return `WO-${ymd}-${String((row?.n || 0) + 1).padStart(3, '0')}`;
+}
 
-  // Kebutuhan job versi aktif: satu entri per material x tahap pipeline
-  const wanted = new Map(); // JOB_KEY -> { material, machine, qty }
-  for (const m of prodMaterials) {
-    for (const machine of pipelineFor(m.article_code, m.colour)) {
-      wanted.set(`${machine}|${m.article_code}|${m.dim1 ?? ''}|${m.dim2 ?? ''}|${m.colour ?? ''}`, {
-        material: m, machine, qty: Number(m.qty) || 0,
-      });
+// ====================================================================
+// BUAT WO: item masuk ekor antrean masing-masing mesin
+// ====================================================================
+export async function createWo({ soId, projectCode, customer, preparedBy, items, userId }) {
+  if (!soId) return { error: 'No SO wajib diisi.' };
+  if (!Array.isArray(items) || items.length === 0) return { error: 'Minimal satu item WO.' };
+
+  const bersih = [];
+  for (const it of items) {
+    const item = String(it.item || '').trim();
+    const qty = parseFloat(it.qtyTarget);
+    if (!item) continue; // baris kosong dilewati
+    if (!(qty > 0)) return { error: `Qty untuk item ${item} harus lebih dari 0.` };
+    if (!MACHINES.includes(it.machine)) return { error: `Mesin tidak valid untuk item ${item}.` };
+    bersih.push({
+      machine: it.machine, item, length_mm: it.lengthMm ? String(it.lengthMm).trim() : null,
+      qty_target: qty, unit: ['Btg', 'Pcs', 'Kg'].includes(it.unit) ? it.unit : 'Btg',
+      raw_material: it.rawMaterial?.trim() || null,
+      multiplier_weight: parseFloat(it.multiplierWeight) || null,
+      req_galva: it.reqGalva ? 1 : 0,
+      coil_number: it.coilNumber?.trim() || null,
+    });
+  }
+  if (bersih.length === 0) return { error: 'Minimal satu item WO terisi lengkap.' };
+
+  // VALIDASI MATCHING KE BOQ: setiap item harus ada di material produksi versi aktif SO ini
+  // (article code + length string persis) dan mesinnya harus sesuai pipeline item tersebut.
+  const [[so]] = await pool.query('SELECT id, active_version_id FROM so WHERE id = ?', [soId]);
+  if (!so) return { error: 'Nomor SO tidak ditemukan di sistem.' };
+  const [materials] = await pool.query('SELECT * FROM so_materials WHERE version_id = ?', [so.active_version_id]);
+  const boqMap = new Map(
+    materials.filter(isProductionMaterial).map((m) => [`${String(m.article_code).trim()}|${String(m.dim1 ?? '').trim()}`, m])
+  );
+  const tidakMatch = [];
+  for (const it of bersih) {
+    const boq = boqMap.get(`${it.item}|${it.length_mm ?? ''}`);
+    if (!boq) {
+      tidakMatch.push(`${it.item} (${it.length_mm ?? '-'} mm) — tidak ada di BOQ versi aktif`);
+      continue;
+    }
+    const stages = [];
+    const base = mapMaterialToMachine(boq.article_code);
+    if (base === 'beam') stages.push('beam', 'welding'); else if (base) stages.push(base);
+    if (String(boq.colour || '').trim().toUpperCase() !== 'GALVA') stages.push('painting');
+    if (!stages.includes(it.machine)) {
+      tidakMatch.push(`${it.item} (${it.length_mm ?? '-'} mm) — mesin ${it.machine} tidak sesuai (harus: ${stages.join('/')})`);
     }
   }
+  if (tidakMatch.length) {
+    return { error: `WO DITOLAK — item tidak match dengan BOQ SO ini: ${tidakMatch.join('; ')}. Periksa kembali article code & length, atau ajukan perubahan BOQ dulu.` };
+  }
 
-  const [existing] = await pool.query(
-    "SELECT * FROM production_jobs WHERE so_id = ? AND status IN ('queued','running','paused','done','buffered')",
-    [soId]
-  );
-  const existingMap = new Map(existing.map((j) => [`${j.machine}|${j.article_code}|${j.dim1 ?? ''}|${j.dim2 ?? ''}|${j.colour ?? ''}`, j]));
+  // VALIDASI QTY: total qty WO (belum dibatalkan) per material+panjang+mesin tidak boleh
+  // melebihi kebutuhan BOQ. Tahapan berjalan sendiri-sendiri (bracing & painting sama-sama
+  // boleh sebesar kebutuhan, karena memproses part yang sama).
+  const sudahAda = {};
+  for (const it of bersih) {
+    const k = `${it.item}|${it.length_mm ?? ''}|${it.machine}`;
+    if (sudahAda[k] === undefined) {
+      const [[row]] = await pool.query(
+        `SELECT COALESCE(SUM(qty_target), 0) AS q FROM production_wo_items
+         WHERE so_id = ? AND item = ? AND (length_mm = ? OR (length_mm IS NULL AND ? IS NULL))
+           AND machine = ? AND status <> 'cancelled'`,
+        [soId, it.item, it.length_mm, it.length_mm, it.machine]
+      );
+      sudahAda[k] = Number(row.q);
+    }
+    const boq = boqMap.get(`${it.item}|${it.length_mm ?? ''}`);
+    const sisa = Number(boq.qty) - sudahAda[k];
+    if (it.qty_target > sisa) {
+      return { error: `WO DITOLAK — ${it.item} (${it.length_mm ?? '-'} mm) di mesin ${it.machine}: maksimal ${Math.max(0, sisa)} ${it.unit} (kebutuhan BOQ ${boq.qty}, sudah ter-WO ${sudahAda[k]}).` };
+    }
+    sudahAda[k] += it.qty_target;
+  }
 
+  const woId = await nextWoId();
   const conn = await pool.getConnection();
-  let created = 0, updated = 0, buffered = 0, cancelled = 0;
   try {
     await conn.beginTransaction();
-
-    // 1. Job baru / penyesuaian target dari material versi aktif
-    for (const [key, w] of wanted) {
-      const old = existingMap.get(key);
-      if (!old) {
-        await conn.query(
-          `INSERT INTO production_jobs (so_id, version_id, material_id, machine, article_code, dim1, dim2, colour, qty_target, status, created_by)
-           VALUES (?,?,?,?,?,?,?,?,?, 'queued', ?)`,
-          [soId, so.active_version_id, w.material.id, w.machine, w.material.article_code,
-            w.material.dim1 ?? null, w.material.dim2 ?? null, w.material.colour ?? null, w.qty, userId]
-        );
-        created++;
-      } else if (old.version_id !== so.active_version_id || Number(old.qty_target) !== w.qty) {
-        // material sama tapi versi/target berubah: pertahankan progres (qty_done)
-        const newDone = Math.min(Number(old.qty_done), w.qty);
-        const status = old.status === 'buffered' ? old.status
-          : newDone >= w.qty && w.qty > 0 ? 'done' : (newDone > 0 ? 'running' : old.status);
-        await conn.query(
-          `UPDATE production_jobs SET version_id = ?, material_id = ?, qty_target = ?, qty_done = ?, status = ?,
-            finished_at = CASE WHEN ? = 'done' THEN COALESCE(finished_at, NOW()) ELSE finished_at END
-           WHERE id = ?`,
-          [so.active_version_id, w.material.id, w.qty, newDone, status, status, old.id]
-        );
-        updated++;
-      }
-      existingMap.delete(key); // sudah dipakai
+    await conn.query(
+      `INSERT INTO production_wo (id, so_id, project_code, customer, prepared_by, created_by)
+       VALUES (?,?,?,?,?,?)`,
+      [woId, soId, projectCode || null, customer || null, preparedBy || null, userId]
+    );
+    for (const it of bersih) {
+      const [[max]] = await conn.query(
+        "SELECT COALESCE(MAX(queue_order), 0) AS q FROM production_wo_items WHERE machine = ? AND status IN ('queued','running','paused')",
+        [it.machine]
+      );
+      await conn.query(
+        `INSERT INTO production_wo_items (wo_id, so_id, machine, item, length_mm, qty_target, unit,
+           raw_material, multiplier_weight, req_galva, coil_number, status, queue_order)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?, 'queued', ?)`,
+        [woId, soId, it.machine, it.item, it.length_mm, it.qty_target, it.unit,
+          it.raw_material, it.multiplier_weight, it.req_galva, it.coil_number, max.q + 1]
+      );
     }
-
-    // 2. Job lama tanpa pasangan di versi baru
-    for (const [, j] of existingMap) {
-      if (j.version_id === so.active_version_id) continue; // job versi aktif tanpa perubahan
-      if (Number(j.qty_done) > 0) {
-        await conn.query("UPDATE production_jobs SET status = 'buffered' WHERE id = ?", [j.id]);
-        buffered++;
-      } else {
-        await conn.query("UPDATE production_jobs SET status = 'cancelled' WHERE id = ?", [j.id]);
-        cancelled++;
-      }
-    }
-
     await conn.commit();
   } catch (err) {
     await conn.rollback();
     conn.release();
-    return { error: 'Gagal menyiapkan job produksi: ' + err.message };
+    return { error: 'Gagal menyimpan WO: ' + err.message };
   }
   conn.release();
-  return { created, updated, buffered, cancelled };
+  await recomputeSoProgress(soId);
+  return { woId, jumlahItem: bersih.length };
 }
 
 // ====================================================================
-// HITUNG PROGRESS SO DARI JOB (write-back so.progress, disetujui)
-// Progress = rata-rata penyelesaian semua job aktif (queued/running/paused/done).
+// CATAT OUTPUT (app admin & halaman operator via kode akses mesin)
 // ====================================================================
-export async function recomputeSoProgress(soId) {
-  const [[row]] = await pool.query(
-    `SELECT COALESCE(SUM(LEAST(qty_done, qty_target)), 0) AS done, COALESCE(SUM(qty_target), 0) AS target
-     FROM production_jobs WHERE so_id = ? AND status IN ('queued','running','paused','done')`,
-    [soId]
-  );
-  const pct = row && row.target > 0 ? Math.min(100, Math.round((row.done / row.target) * 100)) : 0;
-  await pool.query('UPDATE so SET progress = ? WHERE id = ?', [pct, soId]);
-  return pct;
-}
-
-// ====================================================================
-// CATAT OUTPUT (dipakai route app & publik QR)
-// ====================================================================
-export async function recordOutput({ job, qty, note, inputVia, qrTokenId = null, operatorNama = null, userId = null }) {
+export async function recordWoOutput({ item, qty, note, inputVia, operatorNama = null, userId = null }) {
   if (!(qty > 0)) return { error: 'Qty harus lebih besar dari 0.' };
-
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     await conn.query(
-      `INSERT INTO production_output_logs (job_id, qty, note, input_via, qr_token_id, operator_nama, created_by)
-       VALUES (?,?,?,?,?,?,?)`,
-      [job.id, qty, note?.trim() || null, inputVia, qrTokenId, operatorNama?.trim() || null, userId]
+      `INSERT INTO production_output_logs (job_id, wo_item_id, qty, note, input_via, operator_nama, created_by)
+       VALUES (NULL, ?, ?, ?, ?, ?, ?)`,
+      [item.id, qty, note?.trim() || null, inputVia, operatorNama?.trim() || null, userId]
     );
-    const newDone = Number(job.qty_done) + qty;
-    const selesai = newDone >= Number(job.qty_target) && Number(job.qty_target) > 0;
+    const newDone = Number(item.qty_done) + qty;
+    const selesai = newDone >= Number(item.qty_target) && Number(item.qty_target) > 0;
     await conn.query(
-      `UPDATE production_jobs SET
+      `UPDATE production_wo_items SET
          qty_done = ?, status = ?,
          started_at = COALESCE(started_at, NOW()),
          finished_at = CASE WHEN ? THEN NOW() ELSE finished_at END
        WHERE id = ?`,
-      [newDone, selesai ? 'done' : 'running', selesai, job.id]
+      [newDone, selesai ? 'done' : 'running', selesai, item.id]
     );
     await conn.commit();
     return { qtyDone: newDone, selesai };
@@ -171,4 +175,144 @@ export async function recordOutput({ job, qty, note, inputVia, qrTokenId = null,
   } finally {
     conn.release();
   }
+}
+
+// ====================================================================
+// STATUS ITEM WO: pause / resume / cancel
+// ====================================================================
+export async function setWoItemStatus(item, action) {
+  const map = {
+    pause: { dari: ['running'], ke: 'paused' },
+    resume: { dari: ['paused'], ke: 'running' },
+    cancel: { dari: ['queued', 'paused', 'running'], ke: 'cancelled' },
+  };
+  const rule = map[action];
+  if (!rule) return { error: 'Aksi tidak dikenal.' };
+  if (!rule.dari.includes(item.status)) return { error: `Item berstatus ${item.status} tidak bisa di-${action}.` };
+  await pool.query('UPDATE production_wo_items SET status = ? WHERE id = ?', [rule.ke, item.id]);
+  return { status: rule.ke };
+}
+
+// ====================================================================
+// REORDER ANTREAN (hasil drag-and-drop per mesin)
+// ====================================================================
+export async function reorderQueue(machine, itemIds) {
+  if (!MACHINES.includes(machine)) return { error: 'Mesin tidak valid.' };
+  if (!Array.isArray(itemIds)) return { error: 'Daftar item tidak valid.' };
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (let i = 0; i < itemIds.length; i++) {
+      await conn.query(
+        "UPDATE production_wo_items SET queue_order = ? WHERE id = ? AND machine = ? AND status IN ('queued','running','paused')",
+        [i + 1, itemIds[i], machine]
+      );
+    }
+    await conn.commit();
+    return { ok: true };
+  } catch (err) {
+    await conn.rollback();
+    return { error: 'Gagal mengubah urutan: ' + err.message };
+  } finally {
+    conn.release();
+  }
+}
+
+// ====================================================================
+// PROGRESS SO: hasil WO dicocokkan ke total kebutuhan BOQ versi aktif
+// (pencocokan: so_id sama + item = article_code + length_mm = dim1, string persis;
+//  item tanpa pasangan BOQ tetap tercatat di WO progress, tidak menambah SO progress)
+// ====================================================================
+export async function recomputeSoProgress(soId) {
+  const [[so]] = await pool.query('SELECT id, active_version_id FROM so WHERE id = ?', [soId]);
+  if (!so || !so.active_version_id) return 0;
+
+  const [materials] = await pool.query(
+    'SELECT * FROM so_materials WHERE version_id = ?', [so.active_version_id]
+  );
+  const targets = materials.filter(isProductionMaterial);
+  const totalTarget = targets.reduce((a, m) => a + (Number(m.qty) || 0), 0);
+  if (totalTarget === 0) return 0;
+
+  const [produced] = await pool.query(
+    `SELECT item, length_mm, SUM(qty_done) AS qty FROM production_wo_items
+     WHERE so_id = ? AND status IN ('queued','running','paused','done')
+       AND qty_done > 0
+     GROUP BY item, length_mm`,
+    [soId]
+  );
+  const prodMap = new Map(produced.map((p) => [`${String(p.item).trim()}|${String(p.length_mm ?? '').trim()}`, Number(p.qty)]));
+
+  let totalDone = 0;
+  for (const m of targets) {
+    const key = `${String(m.article_code).trim()}|${String(m.dim1 ?? '').trim()}`;
+    totalDone += Math.min(prodMap.get(key) || 0, Number(m.qty) || 0);
+  }
+  const pct = Math.min(100, Math.round((totalDone / totalTarget) * 100));
+  await pool.query('UPDATE so SET progress = ? WHERE id = ?', [pct, soId]);
+  return pct;
+}
+
+// ====================================================================
+// RINGKASAN PROGRESS SO PER MESIN (widget DetailSO & Atur Produksi)
+// ====================================================================
+export async function soProductionSummary(soId) {
+  const [[so]] = await pool.query('SELECT id, active_version_id FROM so WHERE id = ?', [soId]);
+  if (!so) return { error: 'SO tidak ditemukan' };
+
+  const [materials] = await pool.query(
+    'SELECT * FROM so_materials WHERE version_id = ?', [so.active_version_id]
+  );
+  const targets = materials.filter(isProductionMaterial);
+
+  // Hasil produksi dikelompokkan PER MESIN: progres mesin hanya dihitung dari
+  // WO item di mesin itu sendiri (WO painting terpisah, tidak ikut output bracing dsb.)
+  const [produced] = await pool.query(
+    `SELECT item, length_mm, machine, SUM(qty_done) AS qty FROM production_wo_items
+     WHERE so_id = ? AND status IN ('queued','running','paused','done') AND qty_done > 0
+     GROUP BY item, length_mm, machine`,
+    [soId]
+  );
+  const prodMap = new Map(produced.map((p) => [`${String(p.item).trim()}|${String(p.length_mm ?? '').trim()}|${p.machine}`, Number(p.qty)]));
+  // Gabungan (dibatasi target per material) untuk progress keseluruhan SO
+  const combinedMap = new Map();
+  for (const p of produced) {
+    const key = `${String(p.item).trim()}|${String(p.length_mm ?? '').trim()}`;
+    combinedMap.set(key, (combinedMap.get(key) || 0) + Number(p.qty));
+  }
+
+  const perMachine = MACHINES.map((machine) => {
+    // target mesin = material produksi yang pipelinenya melewati mesin ini
+    const items = targets.filter((m) => {
+      const code = String(m.article_code || '').trim().toUpperCase();
+      const galva = String(m.colour || '').trim().toUpperCase() === 'GALVA';
+      const stages = [];
+      const base = mapMaterialToMachine(code);
+      if (!base) return false;
+      if (base === 'beam') stages.push('beam', 'welding'); else stages.push(base);
+      if (!galva) stages.push('painting');
+      return stages.includes(machine);
+    });
+    let done = 0;
+    const target = items.reduce((a, m) => {
+      const key = `${String(m.article_code).trim()}|${String(m.dim1 ?? '').trim()}|${machine}`;
+      done += Math.min(prodMap.get(key) || 0, Number(m.qty) || 0);
+      return a + (Number(m.qty) || 0);
+    }, 0);
+    return { machine, target, done, pct: target > 0 ? Math.round((done / target) * 100) : 0 };
+  });
+
+  const matTarget = targets.reduce((a, m) => a + (Number(m.qty) || 0), 0);
+  let matDone = 0;
+  for (const m of targets) {
+    const key = `${String(m.article_code).trim()}|${String(m.dim1 ?? '').trim()}`;
+    matDone += Math.min(combinedMap.get(key) || 0, Number(m.qty) || 0);
+  }
+  return {
+    so: soId,
+    overall: matTarget > 0 ? Math.round((matDone / matTarget) * 100) : 0,
+    perMachine,
+    totalTarget: matTarget,
+    totalDone: matDone,
+  };
 }

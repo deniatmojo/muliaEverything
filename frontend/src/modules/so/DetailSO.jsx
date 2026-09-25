@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { callApi } from '../../services/api';
-import { isProductionMaterial, MACHINES, jobsPct } from '../production/productionData';
+import { isProductionMaterial, MACHINES, woItemsPct } from '../production/productionData';
 import {
   ArrowLeft,
   Pencil,
@@ -302,18 +302,16 @@ const HeroBlock = ({ id, so, onNavigateBack, onJump, refs, onEdit, onUpload, onP
 // ---------------------------------------------------------------------------
 // Block 2 — Proses Produksi (data asli dari modul Production: production_jobs)
 // ---------------------------------------------------------------------------
-const ProductionBlock = ({ innerRef, soId, materials, jobs, onOpen }) => {
-  // Progres per material = rata-rata job produksinya (roll/welding/painting)
-  const jobsOf = (m) => jobs.filter((j) => j.articleCode === m.articleCode
-    && (j.dim1 ?? '') === (m.dim1 ?? '') && (j.colour ?? '') === (m.colour ?? ''));
-  const progressOf = (m) => jobsPct(jobsOf(m));
-  const overall = jobsPct(jobs);
+const ProductionBlock = ({ innerRef, soId, materials, woItems, summary, onOpen }) => {
+  // Progres per material = agregat item WO yang cocok (item = article code, length = dim1)
+  const itemsOf = (m) => woItems.filter((it) => it.item === m.articleCode
+    && (it.lengthMm ?? '') === (m.dim1 ?? '') && it.status !== 'cancelled');
+  const progressOf = (m) => woItemsPct(itemsOf(m));
+  const overall = summary?.overall ?? woItemsPct(woItems);
   const perMachine = MACHINES.map((mc) => {
-    const items = jobs.filter((j) => j.machine === mc.key);
-    const done = items.reduce((a, j) => a + Math.min(j.qtyDone, j.qtyTarget), 0);
-    const target = items.reduce((a, j) => a + j.qtyTarget, 0);
-    return { name: mc.short, pct: target ? Math.round((done / target) * 100) : 0, done, target };
-  }).filter((p) => p.target > 0);
+    const p = summary?.perMachine?.find((x) => x.machine === mc.key);
+    return p ? { name: mc.short, pct: p.pct, done: p.done, target: p.target } : null;
+  }).filter(Boolean).filter((p) => p.target > 0);
   const fmtPcs = (n) => new Intl.NumberFormat('id-ID').format(n);
 
   return (
@@ -369,8 +367,8 @@ const ProductionBlock = ({ innerRef, soId, materials, jobs, onOpen }) => {
               </thead>
               <tbody>
                 {materials.slice(0, 8).map((row, i) => {
-                  const rowJobs = jobsOf(row);
-                  const machineShorts = [...new Set(rowJobs.map((j) => MACHINES.find((m) => m.key === j.machine)?.short).filter(Boolean))];
+                  const rowItems = itemsOf(row);
+                  const machineShorts = [...new Set(rowItems.map((it) => MACHINES.find((m) => m.key === it.machine)?.short).filter(Boolean))];
                   const galva = String(row.colour || '').toUpperCase() === 'GALVA';
                   const prog = progressOf(row);
                   return (
@@ -694,7 +692,8 @@ const DetailSO = () => {
   // Data master SO (dari backend; bila SO belum ada di DB, tampil nilai default)
   const [soData, setSoData] = useState(null);
   const [prodMaterials, setProdMaterials] = useState([]); // material produksi (lokal MPU/MPD/MPB)
-  const [prodJobs, setProdJobs] = useState([]); // job produksi nyata (production_jobs)
+  const [woItems, setWoItems] = useState([]); // item Working Order SO ini
+  const [prodSummary, setProdSummary] = useState(null); // progress SO vs BOQ per mesin
   const [produksiPct, setProduksiPct] = useState(0);
   useEffect(() => {
     callApi('SO_DETAIL', { soId }).then((res) => {
@@ -704,11 +703,14 @@ const DetailSO = () => {
         setProdMaterials((res.data.materials || []).filter(isProductionMaterial));
       }
     });
-    // Job produksi dibuat otomatis dari material versi aktif saat halaman dibuka
-    callApi('PRODUCTION_JOBS', { soId }).then((res) => {
+    // Eksekusi produksi kini dari Working Order (upload admin di On Going Production)
+    callApi('PRODUCTION_WO_LIST', { soId }).then((res) => {
+      if (res.status === 'success') setWoItems(res.data.items || []);
+    });
+    callApi('PRODUCTION_SO_SUMMARY', { soId }).then((res) => {
       if (res.status === 'success') {
-        setProdJobs(res.data.jobs || []);
-        setProduksiPct(res.data.so?.progress ?? 0);
+        setProdSummary(res.data);
+        setProduksiPct(res.data.overall ?? 0);
       }
     });
   }, [soId]);
@@ -796,7 +798,7 @@ const DetailSO = () => {
           {/* BARIS 2: Produksi */}
           <div className="flex flex-col xl:flex-row gap-5 items-stretch">
             <div className="flex-1 min-w-0 flex flex-col">
-              <ProductionBlock innerRef={produksiRef} soId={soId} materials={prodMaterials} jobs={prodJobs} onOpen={() => navigate(`/production/${soId}`)} />
+              <ProductionBlock innerRef={produksiRef} soId={soId} materials={prodMaterials} woItems={woItems} summary={prodSummary} onOpen={() => navigate(`/production/${soId}`)} />
             </div>
             <div className="w-full xl:w-[380px] shrink-0 flex flex-col">
               <NoteCard moduleKey="produksi" title="Produksi" icon={Factory} accent={ACCENTS.navy} notes={notes.produksi} onSend={handleSendNote} directory={directory} />

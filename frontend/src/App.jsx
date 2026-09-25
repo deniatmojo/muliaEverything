@@ -37,7 +37,8 @@ import MaintenanceHome from './modules/maintenance/MaintenanceHome';
 // Import Modul Production
 import ProductionHome from './modules/production/ProductionHome';
 import DetailProduction from './modules/production/DetailProduction';
-import ScanProduction from './modules/production/ScanProduction';
+import MachineProduction from './modules/production/MachineProduction';
+import WoArchive from './modules/production/WoArchive';
 
 // Dummy Components Sementara
 const Dashboard = () => <DashboardHome />;
@@ -69,8 +70,8 @@ export default function App() {
         {/* Halaman hasil scan QR modul QC: siapa pun yang scan label bisa membuka,
             pengubahan data tetap terkunci PIN dan diverifikasi di server. */}
         <Route path="/qc/scan/:code" element={<QcScan />} />
-        {/* Halaman hasil scan QR produksi: admin lapangan update progress tanpa login */}
-        <Route path="/production/scan/:token" element={<ScanProduction />} />
+        {/* Halaman operator mesin produksi: antrean WO + update progress, kode akses mesin */}
+        <Route path="/production/machine/:machine" element={<MachineProduction />} />
 
         {/* =========================================
             ROUTE SISTEM ADMIN (Area Privat, Dilindungi Satpam)
@@ -86,6 +87,7 @@ export default function App() {
             <Route path="qc" element={<QCHome />} />
             <Route path="maintenance" element={<MaintenanceHome />} />
             <Route path="production" element={<ProductionHome />} />
+            <Route path="production/wo" element={<WoArchive />} />
             <Route path="production/:soId" element={<DetailProduction />} />
             <Route path="*" element={<NotFound />} />
             <Route path="/so" element={<DashboardSO />} />
