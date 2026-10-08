@@ -56,11 +56,24 @@ const BUNDLE_FIELDS = [
   { k: 'total_bundles', label: 'Total Bundles', req: true, type: 'number', ph: '10', half: true },
   { k: 'description', label: 'Product Description', type: 'textarea', ph: 'Tambahkan deskripsi (opsional)...' },
 ];
+// Pilihan dropdown QC Koil
+const COIL_TYPE_GROUPS = [
+  { label: 'MPU / MPD', options: ['MPU 11', 'MPU 12', 'MPU 13', 'MPU 21', 'MPU 22', 'MPU 23', 'MPU 31S', 'MPU 31', 'MPU 32', 'MPU 33', 'MPD 1015', 'MPD 2015', 'MPD 3015'] },
+  { label: 'MPB', options: ['MPB 5007', 'MPB 5008', 'MPB 5009', 'MPB 5010', 'MPB 5011', 'MPB 5012', 'MPB 5013', 'MPB 5014', 'MPB 5015', 'MPB 5016'] },
+];
+const COIL_SUPPLIERS = ['NAI', 'Taehang', 'Java'];
+const COIL_INSPECTORS = ['Yoel Sianipar', 'Jessica'];
+const COIL_DEFAULT_PIN = '4141';
+// Kode singkat supplier di label cetak (selain yang terdaftar, tampil apa adanya)
+const SUPPLIER_LABEL_CODE = { Taehang: 'TH' };
+const COIL_LABEL_MM = { w: 80, h: 60 }; // label koil berukuran tetap 80 x 60 mm (landscape)
+
 const COIL_FIELDS = [
-  { k: 'type_coil', label: 'Type Coil', req: true, ph: 'MPB 5010' },
+  { k: 'type_coil', label: 'Type Coil', req: true, type: 'select', groups: COIL_TYPE_GROUPS, placeholder: '- Pilih Type Coil -' },
   { k: 'berat', label: 'Berat Timbang (KG)', type: 'number', ph: '0', half: true },
   { k: 'no_coil', label: 'No. Coil', req: true, ph: 'PP260709A044A2', half: true },
-  { k: 'supplier', label: 'Supplier', ph: 'NAI' },
+  { k: 'supplier', label: 'Supplier', type: 'select', options: COIL_SUPPLIERS, placeholder: '- Pilih Supplier -' },
+  { k: 'kode_sj', label: 'Kode SJ', ph: 'SJ/20/12/1204' },
 ];
 const FIELDS_PER_TYPE = { bundle: BUNDLE_FIELDS, coil: COIL_FIELDS, packaging: [] };
 
@@ -76,6 +89,11 @@ const fmtCheckDate = (item) => item?.scan_updated_at
 // bukan tanggal pengecekan inspector (permintaan revisi, menyimpang dari aturan sementara)
 const fmtLabelDate = (item) => item?.created_at
   ? new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })
+  : '-';
+
+// ARRIVAL di label koil: tanggal pembuatan QR, format dd/mm/yyyy
+const fmtArrival = (item) => item?.created_at
+  ? new Date(item.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Jakarta' })
   : '-';
 
 // Logo segitiga MULIA 41 untuk label cetak
@@ -132,30 +150,35 @@ function BundleLabel({ item, qrValue }) {
 
 function CoilLabel({ item, qrValue }) {
   const d = item.data || {};
-  const rows = [['TYPE COIL', d.type_coil], ['BERAT', `${d.berat || '-'} KG`], ['NO. COIL', d.no_coil], ['SUPPLIER', d.supplier], ['DATE QC CHECK', fmtLabelDate(item)]];
+  const rows = [
+    ['KODE COIL', d.no_coil],
+    ['JENIS COIL', d.type_coil],
+    ['BERAT LABEL', d.berat ? `${d.berat} KG` : '-'],
+    ['KODE SJ', d.kode_sj],
+  ];
+  const supplier = d.supplier ? (SUPPLIER_LABEL_CODE[d.supplier] || d.supplier).toUpperCase() : '';
+  const serif = "'Times New Roman', serif";
   return (
-    <div style={{ background: '#fff', padding: 14, color: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', borderBottom: '3px solid #000', paddingBottom: 10, marginBottom: 16 }}>
-        <MuliaLogo size={32} />
-        <div style={{ lineHeight: 1, textAlign: 'left' }}>
-          <div style={{ fontFamily: 'Arial, sans-serif', fontWeight: 900, fontSize: 22, letterSpacing: '-0.02em' }}>MULIA 41</div>
-          <div style={{ fontFamily: 'Arial, sans-serif', fontWeight: 700, fontSize: 7.5, letterSpacing: '0.15em' }}>INTEGRATED WAREHOUSE SOLUTIONS</div>
+    <div style={{ background: '#fff', color: '#000', boxSizing: 'border-box', width: `${COIL_LABEL_MM.w}mm`, height: `${COIL_LABEL_MM.h}mm`, padding: '3mm 2mm 3mm 3mm', display: 'flex', gap: '1.5mm', fontFamily: serif, overflow: 'hidden' }}>
+      {/* Kiri: logo, QR, kode supplier, tanggal arrival */}
+      <div style={{ width: '36mm', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <MuliaLogo size={20} />
+          <div style={{ fontFamily: 'Arial, sans-serif', fontWeight: 900, fontSize: 15, lineHeight: 1, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>MULIA 41</div>
         </div>
+        <QRCodeCanvas value={qrValue} size={160} level="M" style={{ width: '33mm', height: '33mm' }} />
+        <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{supplier || ' '}</div>
+        <div style={{ fontWeight: 700, fontSize: 10.5, lineHeight: 1, whiteSpace: 'nowrap' }}>ARRIVAL: {fmtArrival(item)}</div>
       </div>
-      <div style={{ marginBottom: 18 }}>
-        <QRCodeCanvas value={qrValue} size={150} level="M" style={{ width: 150, height: 150 }} />
+      {/* Kanan: data coil */}
+      <div style={{ flex: 1, minWidth: 0, paddingLeft: '3mm', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3.5mm' }}>
+        {rows.map(([k, v]) => (
+          <div key={k} style={{ lineHeight: 1.15 }}>
+            <div style={{ fontWeight: 700, fontSize: 11 }}>{k}:</div>
+            <div style={{ fontWeight: 700, fontSize: 14, wordBreak: 'break-all', textTransform: 'uppercase' }}>{v || '-'}</div>
+          </div>
+        ))}
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: "'Times New Roman', serif", fontStyle: 'italic', fontWeight: 700, fontSize: 13 }}>
-        <tbody>
-          {rows.map(([k, v]) => (
-            <tr key={k} style={{ borderTop: '1px dashed #888' }}>
-              <td style={{ padding: '9px 0', width: '42%', verticalAlign: 'top' }}>{k}</td>
-              <td style={{ padding: '9px 2px', verticalAlign: 'top' }}>:</td>
-              <td style={{ padding: '9px 0', verticalAlign: 'top', wordBreak: 'break-all', textTransform: 'uppercase' }}>{v || '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -238,7 +261,7 @@ export default function QCHome() {
     setDupFrom(null);
     setFormType(type);
     setFormValues({ status_item: type === 'bundle' ? 'InChecking' : 'In Checking', qc_process: 'Unchecking', shift: '1' });
-    setFormPin('');
+    setFormPin(type === 'coil' ? COIL_DEFAULT_PIN : '');
     setFormOpen(true);
   };
 
@@ -264,7 +287,7 @@ export default function QCHome() {
       inspector: '',
       note: '',
     });
-    setFormPin('');
+    setFormPin(item.type === 'coil' ? COIL_DEFAULT_PIN : '');
     setFormOpen(true);
   };
 
@@ -325,10 +348,20 @@ export default function QCHome() {
     root.classList.remove('hidden');
     root.innerHTML = '';
     const clone = cloneWithCanvases(labelRef.current);
-    clone.style.width = `${paperMm}mm`;
+    const isCoil = previewItem?.type === 'coil';
+    const lebar = isCoil ? COIL_LABEL_MM.w : paperMm;
+    clone.style.width = `${lebar}mm`;
     root.appendChild(clone);
-    document.documentElement.style.setProperty('--qc-paper', `${paperMm}mm`);
+    document.documentElement.style.setProperty('--qc-paper', `${lebar}mm`);
+    // Label koil: ukuran halaman dikunci 80 x 60 mm tanpa margin
+    let pageStyle = null;
+    if (isCoil) {
+      pageStyle = document.createElement('style');
+      pageStyle.textContent = `@page { size: ${COIL_LABEL_MM.w}mm ${COIL_LABEL_MM.h}mm; margin: 0; }`;
+      document.head.appendChild(pageStyle);
+    }
     const sembunyikanLagi = () => {
+      pageStyle?.remove();
       root.classList.add('hidden');
       window.removeEventListener('afterprint', sembunyikanLagi);
     };
@@ -347,7 +380,9 @@ export default function QCHome() {
       ]);
       // Render kloningan di container off-screen agar bebas pengaruh tema/modal
       const off = document.createElement('div');
-      off.style.cssText = `position:fixed;left:-9999px;top:0;background:#ffffff;width:${paperMm}mm;`;
+      const isCoil = previewItem.type === 'coil';
+      const lebar = isCoil ? COIL_LABEL_MM.w : paperMm;
+      off.style.cssText = `position:fixed;left:-9999px;top:0;background:#ffffff;width:${lebar}mm;`;
       const clone = cloneWithCanvases(labelRef.current);
       clone.style.width = '100%';
       off.appendChild(clone);
@@ -356,10 +391,10 @@ export default function QCHome() {
       const canvas = await html2canvas(off, { scale: 3, backgroundColor: '#ffffff' });
       document.body.removeChild(off);
 
-      const tinggiMm = (canvas.height / canvas.width) * paperMm;
-      const pdf = new jsPDF({ unit: 'mm', format: [paperMm, tinggiMm], orientation: 'portrait' });
+      const tinggiMm = isCoil ? COIL_LABEL_MM.h : (canvas.height / canvas.width) * lebar;
+      const pdf = new jsPDF({ unit: 'mm', format: [lebar, tinggiMm], orientation: isCoil ? 'landscape' : 'portrait' });
       // JPEG 92% jauh lebih ringan dari PNG (label dominan putih/hitam), tetap tajam untuk QR & teks
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, paperMm, tinggiMm);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, lebar, tinggiMm);
       pdf.save(`Label-${previewItem.code}.pdf`);
     } catch (err) {
       showNotice('Gagal membuat PDF: ' + err.message, 'error');
@@ -623,7 +658,18 @@ export default function QCHome() {
                     </div>
                     {f.type === 'select' ? (
                       <select className={inputCls} value={formValues[f.k] || ''} onChange={(e) => setVal(f.k, e.target.value)}>
-                        {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                        <option value="">{f.placeholder || '- Pilih -'}</option>
+                        {/* nilai lama yang tak ada di daftar tetap tampil agar data tak hilang saat edit */}
+                        {formValues[f.k] && !(f.groups ? f.groups.some((g) => g.options.includes(formValues[f.k])) : f.options.includes(formValues[f.k])) && (
+                          <option value={formValues[f.k]}>{formValues[f.k]}</option>
+                        )}
+                        {f.groups
+                          ? f.groups.map((g) => (
+                              <optgroup key={g.label} label={g.label}>
+                                {g.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                              </optgroup>
+                            ))
+                          : f.options.map((o) => <option key={o} value={o}>{o}</option>)}
                       </select>
                     ) : f.type === 'textarea' ? (
                       <textarea rows={2} className={inputCls} placeholder={f.ph} value={formValues[f.k] || ''} onChange={(e) => setVal(f.k, e.target.value)} />
@@ -649,7 +695,15 @@ export default function QCHome() {
                 </label>
                 <label className="block mb-3">
                   <div className="text-xs font-bold text-gray-500 dark:text-gray-300 mb-1">Inspector QC</div>
-                  <input type="text" className={inputCls} placeholder="Kosongkan jika belum" value={formValues.inspector || ''} onChange={(e) => setVal('inspector', e.target.value)} />
+                  {formType === 'coil' ? (
+                    <select className={inputCls} value={formValues.inspector || ''} onChange={(e) => setVal('inspector', e.target.value)}>
+                      <option value="">Belum diisi</option>
+                      {formValues.inspector && !COIL_INSPECTORS.includes(formValues.inspector) && <option value={formValues.inspector}>{formValues.inspector}</option>}
+                      {COIL_INSPECTORS.map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  ) : (
+                    <input type="text" className={inputCls} placeholder="Kosongkan jika belum" value={formValues.inspector || ''} onChange={(e) => setVal('inspector', e.target.value)} />
+                  )}
                 </label>
                 <label className="block mb-3 col-span-2">
                   <div className="text-xs font-bold text-gray-500 dark:text-gray-300 mb-1">Catatan Inspeksi</div>
@@ -686,13 +740,13 @@ export default function QCHome() {
           <div className="bg-gray-100 dark:bg-gray-900 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shrink-0">
               <div className="text-[12.5px] font-bold text-green-600 dark:text-green-400 flex items-center gap-1.5">
-                <CircleCheck size={14} /> Label Siap Dicetak ({paperMm}mm)
+                <CircleCheck size={14} /> Label Siap Dicetak ({previewItem.type === 'coil' ? `${COIL_LABEL_MM.w}x${COIL_LABEL_MM.h}mm` : `${paperMm}mm`})
               </div>
               <button onClick={() => setPreviewItem(null)} className="text-gray-400 hover:text-red-500"><X size={18} /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto flex justify-center py-6 px-2 custom-scrollbar">
-              <div ref={labelRef} className="bg-white shadow-md border border-gray-300" style={{ width: `${paperMm}mm` }}>
+              <div ref={labelRef} className="bg-white shadow-md border border-gray-300" style={{ width: `${previewItem.type === 'coil' ? COIL_LABEL_MM.w : paperMm}mm` }}>
                 {previewItem.type === 'coil'
                   ? <CoilLabel item={previewItem} qrValue={qrValueFor(previewItem)} />
                   : <BundleLabel item={previewItem} qrValue={qrValueFor(previewItem)} />}
@@ -701,7 +755,7 @@ export default function QCHome() {
 
             <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 shrink-0 space-y-3">
               {/* Pengaturan lebar kertas */}
-              <div className="flex items-center gap-2 text-xs">
+              {previewItem.type !== 'coil' && <div className="flex items-center gap-2 text-xs">
                 <span className="font-bold text-gray-500 dark:text-gray-400 uppercase">Lebar kertas:</span>
                 {PAPER_OPTIONS.map((mm) => (
                   <button
@@ -719,7 +773,7 @@ export default function QCHome() {
                   onChange={(e) => applyPaper(e.target.value)}
                   title="Ukuran custom (mm)"
                 />
-              </div>
+              </div>}
               <div className="flex gap-2">
                 <button onClick={() => setPreviewItem(null)} className="flex-1 rounded-lg py-2.5 text-sm font-bold border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-300">Kembali</button>
                 <button
