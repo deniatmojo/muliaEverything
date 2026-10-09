@@ -159,19 +159,19 @@ function CoilLabel({ item, qrValue }) {
   const supplier = d.supplier ? (SUPPLIER_LABEL_CODE[d.supplier] || d.supplier).toUpperCase() : '';
   const serif = "'Times New Roman', serif";
   return (
-    <div style={{ background: '#fff', color: '#000', boxSizing: 'border-box', width: `${COIL_LABEL_MM.w}mm`, height: `${COIL_LABEL_MM.h}mm`, padding: '3mm 2mm 3mm 3mm', display: 'flex', gap: '1.5mm', fontFamily: serif, overflow: 'hidden' }}>
+    <div style={{ background: '#fff', color: '#000', boxSizing: 'border-box', width: `${COIL_LABEL_MM.w}mm`, height: `${COIL_LABEL_MM.h}mm`, padding: '5mm', display: 'flex', gap: '1.5mm', fontFamily: serif, overflow: 'hidden' }}>
       {/* Kiri: logo, QR, kode supplier, tanggal arrival */}
-      <div style={{ width: '36mm', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ width: '33mm', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <MuliaLogo size={20} />
           <div style={{ fontFamily: 'Arial, sans-serif', fontWeight: 900, fontSize: 15, lineHeight: 1, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>MULIA 41</div>
         </div>
-        <QRCodeCanvas value={qrValue} size={160} level="M" style={{ width: '33mm', height: '33mm' }} />
+        <QRCodeCanvas value={qrValue} size={160} level="M" style={{ width: '25mm', height: '25mm' }} />
         <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{supplier || ' '}</div>
         <div style={{ fontWeight: 700, fontSize: 10.5, lineHeight: 1, whiteSpace: 'nowrap' }}>ARRIVAL: {fmtArrival(item)}</div>
       </div>
       {/* Kanan: data coil */}
-      <div style={{ flex: 1, minWidth: 0, paddingLeft: '3mm', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '3.5mm' }}>
+      <div style={{ flex: 1, minWidth: 0, paddingLeft: '3mm', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '2.5mm' }}>
         {rows.map(([k, v]) => (
           <div key={k} style={{ lineHeight: 1.15 }}>
             <div style={{ fontWeight: 700, fontSize: 11 }}>{k}:</div>
